@@ -13,10 +13,14 @@ Il database `backtorun-db` esiste già su Cloudflare e il suo ID è in `wrangler
 3. Comando di build: `npm run build`. Comando di deploy: `npx wrangler deploy`.
 4. Conferma con **Save and Deploy**.
 5. Nel Worker apri **Settings**, poi **Variables and Secrets**, e aggiungi il Secret `SETUP_CODE` con un codice inventato da te.
-6. Apri l'indirizzo `workers.dev` con Chrome su Android, crea la password e installa l'app dal menu.
+6. Apri l'indirizzo `workers.dev` con Chrome su Android, crea nome utente e password e installa l'app dal menu.
 7. Chiudi e riapri l'app una volta: da quel momento funziona anche senza rete.
 
 Dopo l'installazione, nell'app Suunto puoi usare **Condividi** sul file FIT e scegliere BackToRun.
+
+## Persone
+
+Il primo account è l'amministratore. In **Impostazioni**, **Persone** puoi creare fino a 9 inviti: ogni link vale 7 giorni e una sola volta. Da lì generi anche una nuova password per chi l'ha persa, o elimini un profilo con i suoi dati. Ognuno vede solo i propri dati.
 
 ## Aggiornamenti
 

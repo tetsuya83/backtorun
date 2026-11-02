@@ -1,7 +1,7 @@
 import { signal } from '@preact/signals'
 import type { Activity, Plan, State } from '../shared/engine'
 export interface TestRec { id: string; date: string; kind: string; data: any }
-export interface Data { plan: Plan; state: State; activities: Activity[]; tests: TestRec[] }
+export interface Data { plan: Plan; state: State; activities: Activity[]; tests: TestRec[]; me?: { name: string; isAdmin: boolean } }
 export const data = signal<Data | null>(null)
 export const pending = signal(0)
 export const online = signal(typeof navigator === 'undefined' ? true : navigator.onLine)

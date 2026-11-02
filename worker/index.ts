@@ -10,19 +10,32 @@ const ITER = 10000 // basso di proposito: il piano gratuito concede 10 ms di CPU
 const YEAR = 60 * 60 * 24 * 365
 
 const SCHEMA = [
-  `CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, pass_hash TEXT NOT NULL, salt TEXT NOT NULL, created_at INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, pass_hash TEXT NOT NULL, salt TEXT NOT NULL, created_at INTEGER NOT NULL, name TEXT, is_admin INTEGER NOT NULL DEFAULT 0)`,
   `CREATE TABLE IF NOT EXISTS sessions (token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL, expires_at INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS login_attempts (ip TEXT NOT NULL, ts INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS plan (id INTEGER PRIMARY KEY CHECK (id = 1), json TEXT NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS state (user_id INTEGER PRIMARY KEY, json TEXT NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS activities (id TEXT NOT NULL, user_id INTEGER NOT NULL, date TEXT NOT NULL, json TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY (user_id, id))`,
   `CREATE INDEX IF NOT EXISTS idx_act_date ON activities (user_id, date)`,
+  `CREATE TABLE IF NOT EXISTS invites (code_hash TEXT PRIMARY KEY, user_id INTEGER, expires_at INTEGER NOT NULL, used_at INTEGER)`,
   `CREATE TABLE IF NOT EXISTS tests (id TEXT NOT NULL, user_id INTEGER NOT NULL, date TEXT NOT NULL, kind TEXT NOT NULL, json TEXT NOT NULL, PRIMARY KEY (user_id, id))`,
 ]
+const MAX_USERS = 10
+const INVITE_DAYS = 7
 let ready = false
 async function ensure(db: D1Database) {
   if (ready) return
   await db.batch(SCHEMA.map(s => db.prepare(s)))
+  const cols = (await db.prepare('PRAGMA table_info(users)').all<{ name: string }>()).results.map(c => c.name)
+  if (!cols.includes('name')) {
+    // versione a utente singolo: il primo account diventa amministratore
+    await db.batch([
+      db.prepare('ALTER TABLE users ADD COLUMN name TEXT'),
+      db.prepare('ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0'),
+      db.prepare("UPDATE users SET name = 'roberto', is_admin = 1 WHERE id = (SELECT MIN(id) FROM users)"),
+    ])
+  }
+  await db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS idx_user_name ON users (name)').run()
   await db.prepare('INSERT OR IGNORE INTO plan (id, json) VALUES (1, ?)').bind(JSON.stringify(planData)).run()
   ready = true
 }
@@ -55,26 +68,66 @@ app.get('/api/status', async c => {
   if (t) authed = !!(await c.env.DB.prepare('SELECT 1 FROM sessions WHERE token_hash = ? AND expires_at > ?').bind(await sha(t), Date.now()).first())
   return c.json({ needsSetup: (u?.n ?? 0) === 0, authed })
 })
+const cleanName = (n?: string) => (n ?? '').trim().toLowerCase()
+const validName = (n: string) => /^[a-zà-ÿ0-9._-]{2,24}$/.test(n)
+const nextMonday = () => { const d = new Date(); d.setUTCDate(d.getUTCDate() + ((8 - d.getUTCDay()) % 7 || 7)); return d.toISOString().slice(0, 10) }
+async function createUser(c: any, name: string, password: string, admin: number) {
+  const salt = hex(crypto.getRandomValues(new Uint8Array(16)))
+  const r = await c.env.DB.prepare('INSERT INTO users (pass_hash, salt, created_at, name, is_admin) VALUES (?, ?, ?, ?, ?)').bind(await hashPass(password, salt), salt, Date.now(), name, admin).run()
+  const uid = r.meta.last_row_id as number
+  await c.env.DB.prepare('INSERT INTO state VALUES (?, ?)').bind(uid, JSON.stringify({ ...defaultState, startDate: admin ? defaultState.startDate : nextMonday() })).run()
+  return uid
+}
 app.post('/api/setup', async c => {
-  const { code, password } = await c.req.json<{ code: string; password: string }>()
+  const { code, name: raw, password } = await c.req.json<{ code: string; name: string; password: string }>()
+  const name = cleanName(raw)
   const u = await c.env.DB.prepare('SELECT COUNT(*) n FROM users').first<{ n: number }>()
   if ((u?.n ?? 0) > 0) return c.json({ error: 'Account già creato. Accedi con la tua password.' }, 409)
   if (await tooMany(c)) return c.json({ error: 'Troppi tentativi. Riprova tra 15 minuti.' }, 429)
   if (!c.env.SETUP_CODE) return c.json({ error: 'Manca SETUP_CODE nelle impostazioni del Worker.' }, 500)
   if (!same(code ?? '', c.env.SETUP_CODE)) { await fail(c); return c.json({ error: 'Codice di attivazione errato.' }, 403) }
+  if (!validName(name)) return c.json({ error: 'Il nome utente deve avere da 2 a 24 caratteri, senza spazi.' }, 400)
   if (!password || password.length < 10) return c.json({ error: 'Usa una password di almeno 10 caratteri.' }, 400)
-  const salt = hex(crypto.getRandomValues(new Uint8Array(16)))
-  const r = await c.env.DB.prepare('INSERT INTO users (pass_hash, salt, created_at) VALUES (?, ?, ?)').bind(await hashPass(password, salt), salt, Date.now()).run()
-  const uid = r.meta.last_row_id as number
-  await c.env.DB.prepare('INSERT INTO state VALUES (?, ?)').bind(uid, JSON.stringify(defaultState)).run()
+  await openSession(c, await createUser(c, name, password, 1))
+  return c.json({ ok: true })
+})
+app.get('/api/invite/:code', async c => {
+  if (await tooMany(c)) return c.json({ error: 'Troppi tentativi. Riprova tra 15 minuti.' }, 429)
+  const i = await c.env.DB.prepare('SELECT user_id FROM invites WHERE code_hash = ? AND used_at IS NULL AND expires_at > ?').bind(await sha(c.req.param('code')), Date.now()).first<{ user_id: number | null }>()
+  if (!i) { await fail(c); return c.json({ error: 'Invito non valido o scaduto. Chiedine uno nuovo.' }, 404) }
+  return c.json({ reset: i.user_id != null })
+})
+app.post('/api/redeem', async c => {
+  if (await tooMany(c)) return c.json({ error: 'Troppi tentativi. Riprova tra 15 minuti.' }, 429)
+  const { code, name: raw, password } = await c.req.json<{ code: string; name?: string; password: string }>()
+  const hash = await sha(code ?? '')
+  const i = await c.env.DB.prepare('SELECT user_id FROM invites WHERE code_hash = ? AND used_at IS NULL AND expires_at > ?').bind(hash, Date.now()).first<{ user_id: number | null }>()
+  if (!i) { await fail(c); return c.json({ error: 'Invito non valido o scaduto. Chiedine uno nuovo.' }, 404) }
+  if (!password || password.length < 10) return c.json({ error: 'Usa una password di almeno 10 caratteri.' }, 400)
+  let uid = i.user_id
+  if (uid != null) {
+    const salt = hex(crypto.getRandomValues(new Uint8Array(16)))
+    await c.env.DB.batch([
+      c.env.DB.prepare('UPDATE users SET pass_hash = ?, salt = ? WHERE id = ?').bind(await hashPass(password, salt), salt, uid),
+      c.env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(uid),
+    ])
+  } else {
+    const name = cleanName(raw)
+    if (!validName(name)) return c.json({ error: 'Il nome utente deve avere da 2 a 24 caratteri, senza spazi.' }, 400)
+    if (await c.env.DB.prepare('SELECT 1 FROM users WHERE name = ?').bind(name).first()) return c.json({ error: 'Questo nome utente è già usato.' }, 409)
+    uid = await createUser(c, name, password, 0)
+  }
+  await c.env.DB.prepare('UPDATE invites SET used_at = ? WHERE code_hash = ?').bind(Date.now(), hash).run()
   await openSession(c, uid)
   return c.json({ ok: true })
 })
 app.post('/api/login', async c => {
   if (await tooMany(c)) return c.json({ error: 'Troppi tentativi. Riprova tra 15 minuti.' }, 429)
-  const { password } = await c.req.json<{ password: string }>()
-  const u = await c.env.DB.prepare('SELECT * FROM users LIMIT 1').first<{ id: number; pass_hash: string; salt: string }>()
-  if (!u || !same(await hashPass(password ?? '', u.salt), u.pass_hash)) { await fail(c); return c.json({ error: 'Password errata.' }, 401) }
+  const { name, password } = await c.req.json<{ name: string; password: string }>()
+  const u = await c.env.DB.prepare('SELECT * FROM users WHERE name = ?').bind(cleanName(name)).first<{ id: number; pass_hash: string; salt: string }>()
+  const salt = u?.salt ?? '00000000'
+  const h = await hashPass(password ?? '', salt)
+  if (!u || !same(h, u.pass_hash)) { await fail(c); return c.json({ error: 'Nome utente o password errati.' }, 401) }
   await openSession(c, u.id)
   return c.json({ ok: true })
 })
@@ -91,20 +144,50 @@ const auth = async (c: any, next: any) => {
   if (!s) return c.json({ error: 'Sessione scaduta. Accedi di nuovo.' }, 401)
   c.set('uid', s.user_id); await next()
 }
-for (const p of ['/api/bootstrap', '/api/state', '/api/activities/*', '/api/tests/*', '/api/import']) app.use(p, auth)
+for (const p of ['/api/bootstrap', '/api/state', '/api/activities/*', '/api/tests/*', '/api/import', '/api/admin/*']) app.use(p, auth)
+app.use('/api/admin/*', async (c, next) => {
+  const u = await c.env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(c.get('uid')).first<{ is_admin: number }>()
+  if (!u?.is_admin) return c.json({ error: 'Riservato all\'amministratore.' }, 403)
+  await next()
+})
+app.get('/api/admin/users', async c => {
+  const now = Date.now()
+  const u = await c.env.DB.prepare('SELECT u.id, u.name, u.is_admin isAdmin, u.created_at createdAt, (SELECT COUNT(*) FROM activities a WHERE a.user_id = u.id) activities FROM users u ORDER BY u.id').all()
+  const i = await c.env.DB.prepare('SELECT COUNT(*) n FROM invites WHERE user_id IS NULL AND used_at IS NULL AND expires_at > ?').bind(now).first<{ n: number }>()
+  return c.json({ users: u.results, openInvites: i?.n ?? 0, max: MAX_USERS })
+})
+app.post('/api/admin/invites', async c => {
+  const { userId } = await c.req.json<{ userId?: number }>().catch(() => ({} as { userId?: number }))
+  const now = Date.now()
+  if (userId == null) {
+    const n = await c.env.DB.prepare('SELECT (SELECT COUNT(*) FROM users) + (SELECT COUNT(*) FROM invites WHERE user_id IS NULL AND used_at IS NULL AND expires_at > ?) n').bind(now).first<{ n: number }>()
+    if ((n?.n ?? 0) >= MAX_USERS) return c.json({ error: `Hai raggiunto il massimo di ${MAX_USERS} persone, inviti aperti compresi.` }, 409)
+  } else if (!await c.env.DB.prepare('SELECT 1 FROM users WHERE id = ?').bind(userId).first()) return c.json({ error: 'Persona non trovata.' }, 404)
+  const code = hex(crypto.getRandomValues(new Uint8Array(12)))
+  await c.env.DB.prepare('INSERT INTO invites VALUES (?, ?, ?, NULL)').bind(await sha(code), userId ?? null, now + INVITE_DAYS * 864e5).run()
+  return c.json({ code, days: INVITE_DAYS })
+})
+app.delete('/api/admin/users/:id', async c => {
+  const id = +c.req.param('id'), db = c.env.DB
+  if (id === c.get('uid')) return c.json({ error: 'Non puoi eliminare il tuo account.' }, 400)
+  await db.batch(['sessions', 'state', 'activities', 'tests', 'invites'].map(t => db.prepare(`DELETE FROM ${t} WHERE user_id = ?`).bind(id)).concat(db.prepare('DELETE FROM users WHERE id = ?').bind(id)))
+  return c.json({ ok: true })
+})
 
 const dump = async (db: D1Database, uid: number) => {
-  const [p, s, a, t] = await db.batch<any>([
+  const [p, s, a, t, u] = await db.batch<any>([
     db.prepare('SELECT json FROM plan WHERE id = 1'),
     db.prepare('SELECT json FROM state WHERE user_id = ?').bind(uid),
     db.prepare('SELECT json FROM activities WHERE user_id = ? ORDER BY date').bind(uid),
     db.prepare('SELECT json FROM tests WHERE user_id = ? ORDER BY date').bind(uid),
+    db.prepare('SELECT name, is_admin FROM users WHERE id = ?').bind(uid),
   ])
   return {
     plan: JSON.parse(p.results[0].json),
     state: s.results[0] ? JSON.parse(s.results[0].json) : defaultState,
     activities: a.results.map((r: any) => JSON.parse(r.json)),
     tests: t.results.map((r: any) => JSON.parse(r.json)),
+    me: { name: u.results[0]?.name, isAdmin: !!u.results[0]?.is_admin },
   }
 }
 app.get('/api/bootstrap', async c => c.json(await dump(c.env.DB, c.get('uid'))))

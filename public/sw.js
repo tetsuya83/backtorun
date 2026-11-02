@@ -1,4 +1,4 @@
-const V = 'btr-v1'
+const V = 'btr-v2'
 self.addEventListener('install', e => { self.skipWaiting(); e.waitUntil(caches.open(V).then(c => c.addAll(['/', '/manifest.webmanifest']))) })
 self.addEventListener('activate', e => e.waitUntil((async () => {
   for (const k of await caches.keys()) if (k !== V && k !== 'btr-share') await caches.delete(k)

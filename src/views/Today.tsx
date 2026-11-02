@@ -78,7 +78,7 @@ export function Today() {
         <p>{nextSlot.sessions.find(x => sessionDate(nextSlot, x.day) === nextDate)?.text}</p>
       </section>}
       <section class="panel quiet">
-        <h2>{mn} a Cornaredo: {temp}</h2>
+        <h2>{mn} in zona Milano: {temp}</h2>
         <p>{tip} Valori medi di Milano.</p>
       </section>
     </div>

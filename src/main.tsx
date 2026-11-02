@@ -37,6 +37,7 @@ function App() {
       try { s = await call('GET', '/api/status') }
       catch { await load(); setAuth('in'); return }
       if (!s.authed) { setAuth(s.needsSetup ? 'setup' : 'login'); return }
+      if (location.hash.startsWith('#/invito/')) location.hash = '#/oggi'
       await load(); setAuth('in')
     } catch (e: any) { setAuth(e.status === 401 ? 'login' : 'error') }
   }

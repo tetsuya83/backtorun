@@ -51,7 +51,7 @@ export function Tests() {
         <label class="check"><input type="checkbox" checked={swollen} onChange={e => setSwollen(e.currentTarget.checked)} /> Mercoledì mattina il ginocchio è gonfio</label>
         <button class="btn" type="button" onClick={() => { persist(); saveState({ ...d.state, startWeek: res.week, skips: [], repeats: [] }); setApplied(true) }}>{applied ? 'Partenza impostata' : `Parti dalla settimana ${res.week}`}</button>
       </section>}
-      <p class="sub pad">Test ideato per te, non validato: le soglie sono stime da allenatore.</p>
+      <p class="sub pad">Test non validato: le soglie sono stime da allenatore.</p>
     </div>
   )
 }
