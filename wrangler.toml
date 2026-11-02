@@ -1,0 +1,14 @@
+name = "backtorun"
+main = "worker/index.ts"
+compatibility_date = "2026-10-01"
+keep_vars = true
+
+[assets]
+directory = "./dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "backtorun-db"
+database_id = "a6875c6b-2adf-4a52-81bb-56954ff16af5"

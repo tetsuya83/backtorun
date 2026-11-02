@@ -1,0 +1,40 @@
+# BackToRun
+
+La tua app di preparazione alla maratona: piano, fiato e fatica attesi, registrazione manuale o da file FIT, lavori extra, test e andamento.
+
+Gira gratis su Cloudflare (Workers e D1). Tempo stimato per la pubblicazione: 15 minuti.
+
+## Pubblicazione
+
+Il database `backtorun-db` esiste già su Cloudflare e il suo ID è in `wrangler.toml`.
+
+1. In Cloudflare apri **Workers & Pages**, scegli **Create application**, poi **GitHub**.
+2. Scegli il repository `backtorun`. Il nome del Worker deve essere esattamente `backtorun`.
+3. Comando di build: `npm run build`. Comando di deploy: `npx wrangler deploy`.
+4. Conferma con **Save and Deploy**.
+5. Nel Worker apri **Settings**, poi **Variables and Secrets**, e aggiungi il Secret `SETUP_CODE` con un codice inventato da te.
+6. Apri l'indirizzo `workers.dev` con Chrome su Android, crea la password e installa l'app dal menu.
+7. Chiudi e riapri l'app una volta: da quel momento funziona anche senza rete.
+
+Dopo l'installazione, nell'app Suunto puoi usare **Condividi** sul file FIT e scegliere BackToRun.
+
+## Aggiornamenti
+
+Ogni modifica caricata su GitHub viene pubblicata in automatico.
+
+## Backup
+
+In **Impostazioni** puoi scaricare un backup JSON e un CSV. Fai un backup al mese: il piano gratuito non è un archivio garantito.
+
+## Limiti del piano gratuito
+
+100.000 richieste API al giorno, 5 milioni di righe lette e 100.000 scritte al giorno, 5 GB di spazio. Per una persona sono ampiamente sufficienti.
+
+## Sviluppo locale
+
+    npm install
+    npm run build
+    npx wrangler dev --local    # usa .dev.vars con SETUP_CODE=...
+    npm test
+
+La libreria FIT di Garmin ha una propria licenza: `node_modules/@garmin/fitsdk/LICENSE.txt`.
