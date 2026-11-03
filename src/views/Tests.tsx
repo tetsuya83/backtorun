@@ -1,13 +1,13 @@
 import { useState } from 'preact/hooks'
 import { data, saveState, saveTest, uid } from '../api'
-import { ROUNDS, scalaResult, type ScalaRound } from '../../shared/engine'
+import { isCustom, planFor, ROUNDS, scalaResult, type ScalaRound } from '../../shared/engine'
 import { fmtDate, todayISO } from '../guide'
 import { breathHint, Field, Note, Scale } from '../ui'
 
 const empty = (): ScalaRound => ({ finished: null, fiato: null, fatica: null, knee: null, hrEnd: null, hr1: null, quit: null, quitMin: null })
 const FAIL = ['Fiato', 'Gambe', 'Ginocchio', 'Testa', 'Niente']
 export function Tests() {
-  const d = data.value!
+  const d = data.value!, custom = isCustom(planFor(d))
   const last = [...d.tests].filter(t => t.kind === 'scala').sort((a, b) => a.date.localeCompare(b.date)).at(-1)
   const [id] = useState(last?.id ?? uid())
   const [rs, setRs] = useState<ScalaRound[]>(last?.data.rounds ?? ROUNDS.map(empty))
@@ -25,7 +25,7 @@ export function Tests() {
   const stop = r.finished === false || (r.fiato ?? 0) >= 4 || (r.knee ?? 0) > 2
   return (
     <div class="stack form">
-      <section class="head"><h1>La Scala</h1><p>5 round di corsa facile, a frasi complete. 5' di camminata prima e dopo, 2' tra i round.</p>{last && <p class="sub">Ultimo test del {fmtDate(last.date, { day: 'numeric', month: 'long' })}</p>}</section>
+      <section class="head"><h1>La Scala</h1><p>5 round di corsa facile, a frasi complete. 5' di camminata prima e dopo, 2' tra i round.</p>{custom && <p class="sub">Il risultato serve a misurarti: la partenza del piano base non cambia il tuo piano personale.</p>}{last && <p class="sub">Ultimo test del {fmtDate(last.date, { day: 'numeric', month: 'long' })}</p>}</section>
       <div class="ladder" role="group" aria-label="Round">
         {ROUNDS.map((m, i) => <button key={i} type="button" onClick={() => setCur(i)} aria-pressed={cur === i} class={(cur === i ? 'sel ' : '') + (rs[i].finished ? 'ok' : rs[i].finished === false ? 'ko' : '')} style={{ height: `${44 + m * 6}px` }}><b>{m}'</b><small>R{i + 1}</small></button>)}
       </div>
@@ -45,11 +45,11 @@ export function Tests() {
       {cur < 4 && r.finished && !stop && <button type="button" class="btn ghost" onClick={() => { setCur(cur + 1); persist(); scrollTo(0, 0) }}>Vai al round {cur + 2}</button>}
       {anyDone && <section class="panel go result">
         <p class="eyebrow">{res.closedRounds ? `${res.closedRounds} ${res.closedRounds === 1 ? 'round chiuso' : 'round chiusi'}` : 'Nessun round chiuso'}{res.bonus ? ', con bonus' : ''}</p>
-        <h2>Parti dalla settimana {res.week}</h2>
+        {!custom && <h2>Parti dalla settimana {res.week}</h2>}
         <fieldset class="scale"><legend>Cosa ha ceduto per primo?</legend><div class="seg">{FAIL.map(f => <button type="button" key={f} class={first === f ? 'sel' : ''} onClick={() => setFirst(f)}>{f}</button>)}</div></fieldset>
         <Scale label="Mercoledì mattina: dolore al ginocchio" min={0} max={10} value={wed} onChange={setWed} />
         <label class="check"><input type="checkbox" checked={swollen} onChange={e => setSwollen(e.currentTarget.checked)} /> Mercoledì mattina il ginocchio è gonfio</label>
-        <button class="btn" type="button" onClick={() => { persist(); saveState({ ...d.state, startWeek: res.week, skips: [], repeats: [] }); setApplied(true) }}>{applied ? 'Partenza impostata' : `Parti dalla settimana ${res.week}`}</button>
+        {custom ? <button class="btn ghost" type="button" onClick={() => persist()}>Salva il test</button> : <button class="btn" type="button" onClick={() => { persist(); saveState({ ...d.state, startWeek: res.week, skips: [], repeats: [] }); setApplied(true) }}>{applied ? 'Partenza impostata' : `Parti dalla settimana ${res.week}`}</button>}
       </section>}
       <p class="sub pad">Test non validato: le soglie sono stime da allenatore.</p>
     </div>

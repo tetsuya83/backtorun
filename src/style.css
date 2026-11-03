@@ -54,3 +54,9 @@ input,select,textarea{width:100%;background:var(--deep);border:2px solid var(--l
 @media (prefers-reduced-motion:no-preference){.stripes i.on{animation:lit .5s ease-out both}@keyframes lit{from{opacity:.2}}}
 
 .people li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;background:var(--deep);border-radius:var(--r);min-height:52px}.people li>div:first-child{display:flex;flex-direction:column}.people .row{flex:none;gap:14px}.link.danger{color:var(--stop)}.link{min-height:32px}
+
+.choice .eyebrow{font-size:14px;margin-bottom:-6px}.choice h2{font-size:26px}
+.days{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}.days button{min-height:50px;background:var(--deep);border:0;border-radius:3px;cursor:pointer;font:600 20px/1 var(--cond);padding:0}.days button.sel{background:var(--vest);color:var(--ink)}.days button:disabled{opacity:.35;cursor:not-allowed}
+.seg.race{display:grid;grid-template-columns:1fr 1fr}.seg.race button{flex:none;min-height:52px}
+.ses.edit{gap:10px}.ses.edit .link{align-self:flex-start}
+.savebar{position:sticky;bottom:calc(72px + env(safe-area-inset-bottom));background:var(--night);padding:8px 0}

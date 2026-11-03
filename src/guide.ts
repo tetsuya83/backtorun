@@ -29,6 +29,11 @@ export const breathLevel = (s?: string | null) => {
   if (/brevi/i.test(s)) return 3
   return 2
 }
-export const WEEKDAY = { mar: 'Martedì', mer: 'Mercoledì', ven: 'Venerdì', dom: 'Domenica' } as const
+export const WEEKDAY = { lun: 'Lunedì', mar: 'Martedì', mer: 'Mercoledì', gio: 'Giovedì', ven: 'Venerdì', sab: 'Sabato', dom: 'Domenica' } as const
+export const dayList = (l: (keyof typeof WEEKDAY)[]) => l.map(d => WEEKDAY[d].toLowerCase()).join(' e ')
+/** Le parole del piano base parlano del ginocchio di Roberto; quelle del piano personale restano generali. */
+export const painWords = (custom: boolean) => custom
+  ? { pain: 'Dolore', chart: 'Dolore durante la corsa', locked: 'Ho dovuto fermarmi per il dolore', askTitle: 'Come stai stamattina?', ask: 'Dopo la corsa di ieri hai gonfiore a una gamba o a un piede?', yes: 'Sì, ho gonfiore', stop: 'Dolore che ferma la corsa: stop.', stopText: 'Non correre finché non hai capito cosa è successo. Se non passa, senti il medico.', warn: 'Dolore da rispettare.', warnText: 'Due giorni senza corsa, poi riparti da un passo indietro.' }
+  : { pain: 'Dolore al ginocchio', chart: 'Dolore al ginocchio', locked: 'Il ginocchio si è bloccato o ha ceduto', askTitle: 'Come sta il ginocchio stamattina?', ask: 'Dopo la corsa di ieri, è gonfio?', yes: 'Sì, è gonfio', stop: 'Ginocchio bloccato: stop corsa.', stopText: 'Non correre fino a una valutazione. Bici e nuoto solo se non danno dolore.', warn: 'Ginocchio da rispettare.', warnText: 'Stop corsa per 2 giorni, solo bici o nuoto, poi riparti da un passo indietro.' }
 export const fmtDate = (iso: string, opt: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long' }) => new Intl.DateTimeFormat('it-IT', { timeZone: 'UTC', ...opt }).format(new Date(iso + 'T12:00:00Z'))
 export const todayISO = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10) }

@@ -1,8 +1,10 @@
-export type Day = 'mar' | 'mer' | 'ven' | 'dom'
-export interface Session { day: Day; text: string; km: number | null; fiato?: string | null; fatica?: string | null }
-export interface Week { week: number | string; phase: number; scarico: boolean; skippable: boolean; total: number | null; sessions: Session[] }
-export interface Plan { meta: { phases: Record<string, string> }; weeks: Week[]; maintenance: Week[] }
-export interface State { startDate: string; startWeek: number; skips: number[]; repeats: number[]; raceDate: string | null; raceName?: string | null }
+export type Day = 'lun' | 'mar' | 'mer' | 'gio' | 'ven' | 'sab' | 'dom'
+export const DAYS: Day[] = ['lun', 'mar', 'mer', 'gio', 'ven', 'sab', 'dom']
+export interface Session { day: Day; text: string; km: number | null; fiato?: string | null; fatica?: string | null; race?: boolean }
+export interface Week { week: number | string; phase: number; scarico: boolean; skippable: boolean; total: number | null; sessions: Session[]; uid?: string }
+export interface PlanMeta { phases: Record<string, string>; kind?: 'custom'; id?: string; name?: string; strengthDays?: Day[] }
+export interface Plan { meta: PlanMeta; weeks: Week[]; maintenance: Week[] }
+export interface State { startDate: string; startWeek: number; skips: number[]; repeats: number[]; raceDate: string | null; raceName?: string | null; mode?: 'base' | 'custom'; other?: Partial<State> | null }
 export interface Activity {
   id: string; date: string; type: 'corsa' | 'forza' | 'nuoto' | 'bici' | 'altro'; sessionKey?: string | null; source: 'manuale' | 'fit'
   km?: number | null; seconds?: number | null; hrAvg?: number | null; hrMax?: number | null; hrLast?: number | null
@@ -12,7 +14,7 @@ export interface Activity {
 export interface Slot extends Week { monday: string; key: string; maintenance?: boolean; occurrence: number }
 
 export const defaultState: State = { startDate: '2026-11-09', startWeek: 1, skips: [], repeats: [], raceDate: null, raceName: null }
-const DAY_OFFSET: Record<Day, number> = { mar: 1, mer: 2, ven: 4, dom: 6 }
+const DAY_OFFSET: Record<Day, number> = { lun: 0, mar: 1, mer: 2, gio: 3, ven: 4, sab: 5, dom: 6 }
 export const SPECIFIC_WEEKS = 16
 
 export const addDays = (iso: string, n: number) => {
@@ -25,12 +27,25 @@ export const diffDays = (a: string, b: string) => Math.round((Date.parse(b + 'T1
 export const sessionDate = (s: Slot, day: Day) => addDays(s.monday, DAY_OFFSET[day])
 export const sessionKey = (s: Slot, day: Day) => `${s.key}-${day}`
 
+export const isCustom = (p: Plan) => p.meta.kind === 'custom'
+export const strengthDays = (p: Plan): Day[] => p.meta.strengthDays ?? (isCustom(p) ? [] : ['lun', 'gio'])
+/** Piano in uso: quello personale solo se attivo e presente. */
+export const planFor = (d: { plan: Plan; custom?: Plan | null; state: State }) => d.state.mode === 'custom' && d.custom ? d.custom : d.plan
+
 export interface Timeline { slots: Slot[]; raceTooClose: boolean; earliestRace: string; spareWeeks: number }
 
 /** Calcola il calendario dal piano e dallo stato: salti e ripetizioni spostano tutto, la Fase 4 si aggancia alla gara. */
 export function buildTimeline(plan: Plan, st: State): Timeline {
   const slots: Slot[] = []
   let monday = mondayOf(st.startDate)
+  if (isCustom(plan)) {
+    for (const w of plan.weeks) {
+      const times = 1 + st.repeats.filter(r => r === w.week).length
+      for (let i = 0; i < times; i++) { slots.push({ ...w, monday, key: `${w.uid ?? 'w' + w.week}.${i}`, occurrence: i }); monday = addDays(monday, 7) }
+    }
+    const last = slots.at(-1)!.monday
+    return { slots, raceTooClose: !!st.raceDate && last > mondayOf(st.raceDate), earliestRace: addDays(last, 6), spareWeeks: 0 }
+  }
   const push = (w: Week, key: string, occurrence: number, maintenance = false) => {
     slots.push({ ...w, monday, key, occurrence, maintenance }); monday = addDays(monday, 7)
   }
@@ -56,6 +71,48 @@ export function buildTimeline(plan: Plan, st: State): Timeline {
     fill(52)
   }
   return { slots, raceTooClose, earliestRace, spareWeeks }
+}
+
+/** Sposta la gara di un piano personale: la gara cambia giorno e il calendario la segue. */
+export function moveRace(plan: Plan, st: State, raceDate: string | null): { plan: Plan; state: State } {
+  if (!raceDate) return { plan, state: { ...st, raceDate: null } }
+  const day = DAYS[diffDays(mondayOf(raceDate), raceDate)]
+  const weeks = plan.weeks.map(w => {
+    if (!w.sessions.some(s => s.race)) return w
+    const rest = w.sessions.filter(s => s.race || s.day !== day)
+    return { ...w, sessions: rest.map(s => s.race ? { ...s, day } : s).sort(byDay) }
+  })
+  const n = weeks.length + st.repeats.length
+  return { plan: { ...plan, weeks }, state: { ...st, raceDate, startDate: addDays(mondayOf(raceDate), -7 * (n - 1)) } }
+}
+const byDay = (a: Session, b: Session) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day)
+
+/** Numera le settimane e ricalcola i totali di un piano personale. */
+export function normalizePlan(plan: Plan): Plan {
+  return { ...plan, weeks: plan.weeks.map((w, i) => {
+    const sessions = [...w.sessions].sort(byDay), km = sessions.filter(s => s.km).map(s => s.km!)
+    return { ...w, week: i + 1, sessions, skippable: false, total: km.length ? Math.round(km.reduce((a, b) => a + b, 0) * 10) / 10 : null }
+  }) }
+}
+export const MAX_WEEKS = 80
+
+/** Restituisce il problema del piano, oppure null se è valido. */
+export function planError(p: any): string | null {
+  if (p?.meta?.kind !== 'custom' || !p.meta.id || !p.meta.phases || !Array.isArray(p.weeks)) return 'Piano non valido.'
+  if (!p.weeks.length) return 'Il piano deve avere almeno una settimana.'
+  if (p.weeks.length > MAX_WEEKS) return `Il piano può avere al massimo ${MAX_WEEKS} settimane.`
+  for (const [i, w] of p.weeks.entries()) {
+    if (!Array.isArray(w.sessions)) return 'Piano non valido.'
+    const seen = new Set<string>()
+    for (const s of w.sessions) {
+      if (!DAYS.includes(s.day)) return 'Piano non valido.'
+      if (seen.has(s.day)) return `Settimana ${i + 1}: due sedute nello stesso giorno.`
+      seen.add(s.day)
+      if (!String(s.text ?? '').trim()) return `Settimana ${i + 1}: scrivi cosa prevede ogni seduta.`
+      if (s.km != null && !(s.km >= 0 && s.km <= 200)) return `Settimana ${i + 1}: distanza non valida.`
+    }
+  }
+  return null
 }
 
 export const slotForDate = (t: Timeline, date: string) => t.slots.find(s => date >= s.monday && date < addDays(s.monday, 7))

@@ -1,10 +1,10 @@
 import { data, saveActivity, saveState } from '../api'
-import { addDays, buildTimeline, reviewWeek, sessionDate, sessionKey, slotForDate, type Activity, type Plan, type Slot } from '../../shared/engine'
-import { fmtDate, MONTHS, STRENGTH, STRENGTH_LIST, todayISO } from '../guide'
+import { addDays, buildTimeline, DAYS, isCustom, planFor, reviewWeek, sessionDate, sessionKey, slotForDate, strengthDays, type Activity, type Plan, type Slot } from '../../shared/engine'
+import { fmtDate, MONTHS, painWords, STRENGTH, STRENGTH_LIST, todayISO } from '../guide'
 import { Gauge, Note } from '../ui'
 import { paceOf, timeOf } from '../fit'
 
-export const phaseName = (plan: Plan, p: number) => plan.meta.phases[String(p)]
+export const phaseName = (plan: Plan, p: number) => plan.meta.phases[String(p)] ?? 'Piano'
 export const weekLabel = (s: Slot) => s.maintenance ? 'Mantenimento' : `Settimana ${s.week}`
 
 function SessionHero({ s, date, done, label }: { s: Slot; date: string; done?: Activity; label: string }) {
@@ -23,7 +23,7 @@ function SessionHero({ s, date, done, label }: { s: Slot; date: string; done?: A
 }
 
 export function Today() {
-  const d = data.value!, t = buildTimeline(d.plan, d.state), today = todayISO()
+  const d = data.value!, plan = planFor(d), custom = isCustom(plan), words = painWords(custom), t = buildTimeline(plan, d.state), today = todayISO()
   const first = t.slots[0], slot = slotForDate(t, today)
   const started = today >= first.monday
   const [mn, temp, tip] = MONTHS[+today.slice(5, 7) - 1]
@@ -40,32 +40,37 @@ export function Today() {
   const prev = idx > 0 ? t.slots[idx - 1] : undefined
   const wd = new Date(today + 'T12:00:00Z').getUTCDay()
   const rv = slot && wd === 0 ? reviewWeek(t, slot, d.activities) : prev ? reviewWeek(t, prev, d.activities) : null
-  const nextDate = slot?.sessions.map(x => sessionDate(slot, x.day)).find(x => x > today) ?? (slot ? sessionDate(t.slots[idx + 1], t.slots[idx + 1].sessions[0].day) : null)
+  const nextDate = t.slots.flatMap(s => s.sessions.map(x => sessionDate(s, x.day))).filter(x => x > today).sort()[0] ?? null
   const nextSlot = nextDate ? slotForDate(t, nextDate) : null
-  const isStrength = wd === 1 || wd === 4
+  const isStrength = strengthDays(plan).includes(DAYS[(wd + 6) % 7])
   return (
     <div class="stack">
       {!started && <section class="hero">
         <p class="eyebrow">Mancano {Math.ceil((Date.parse(first.monday) - Date.parse(today)) / 864e5)} giorni</p>
         <h1>Si parte il {fmtDate(first.monday, { day: 'numeric', month: 'long' })}, dalla settimana {first.week}</h1>
-        <a class="btn" href="#/test">Fai il test della Scala</a>
+        {custom ? <a class="btn" href="#/piano">Guarda il piano</a> : <a class="btn" href="#/test">Fai il test della Scala</a>}
       </section>}
-      {stop && <Note tone="stop"><strong>Ginocchio bloccato: stop corsa.</strong> Non correre fino a una valutazione. Bici e nuoto solo se non danno dolore.</Note>}
-      {swollen && <Note tone="stop"><strong>Ginocchio da rispettare.</strong> Stop corsa per 2 giorni, solo bici o nuoto, poi riparti da un passo indietro.</Note>}
+      {stop && <Note tone="stop"><strong>{words.stop}</strong> {words.stopText}</Note>}
+      {swollen && <Note tone="stop"><strong>{words.warn}</strong> {words.warnText}</Note>}
       {check && <section class="panel">
-        <h2>Come sta il ginocchio stamattina?</h2>
-        <p>Dopo la corsa di ieri, è gonfio?</p>
+        <h2>{words.askTitle}</h2>
+        <p>{words.ask}</p>
         <div class="row">
           <button class="btn ghost" onClick={() => saveActivity({ ...check, swelling: false })}>No</button>
-          <button class="btn ghost danger" onClick={() => saveActivity({ ...check, swelling: true })}>Sì, è gonfio</button>
+          <button class="btn ghost danger" onClick={() => saveActivity({ ...check, swelling: true })}>{words.yes}</button>
         </div>
       </section>}
-      {started && slot && ses && <SessionHero s={slot} date={today} done={done} label={`${weekLabel(slot)}, ${phaseName(d.plan, slot.phase)}${slot.scarico ? ', scarico' : ''}`} />}
+      {started && slot && ses && <SessionHero s={slot} date={today} done={done} label={`${weekLabel(slot)}, ${phaseName(plan, slot.phase)}${slot.scarico ? ', scarico' : ''}`} />}
       {started && slot && !ses && <section class="hero rest">
-        <p class="eyebrow">{weekLabel(slot)}, {phaseName(d.plan, slot.phase)}</p>
+        <p class="eyebrow">{weekLabel(slot)}, {phaseName(plan, slot.phase)}</p>
         <h1>{isStrength ? 'Oggi forza' : 'Oggi niente corsa'}</h1>
-        <p>{isStrength ? `${STRENGTH[String(slot.phase)]}. ${STRENGTH_LIST}` : wd === 6 ? 'Nuoto o bici facili, se ti va.' : 'Riposo o nuoto facile.'}</p>
+        <p>{isStrength ? `${STRENGTH[String(slot.phase)] ?? STRENGTH['1']}. ${STRENGTH_LIST}` : wd === 6 ? 'Nuoto o bici facili, se ti va.' : 'Riposo o nuoto facile.'}</p>
         {isStrength && <a class="btn" href={`#/registra?type=forza&date=${today}`}>Registra forza</a>}
+      </section>}
+      {started && !slot && <section class="hero rest">
+        <p class="eyebrow">Piano concluso</p>
+        <h1>Bel lavoro</h1>
+        <a class="btn" href="#/mio-piano">Scegli il prossimo obiettivo</a>
       </section>}
       {started && rv?.overload && <Note><strong>Fatica sopra le attese per due sedute di fila.</strong> Ripeti questa settimana invece di proseguire.</Note>}
       {started && rv?.canSkip && rv.next && <section class="panel go">

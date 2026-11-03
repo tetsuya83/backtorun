@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 import planData from '../shared/plan.json'
-import { defaultState } from '../shared/engine'
+import { defaultState, planError } from '../shared/engine'
 
 type Env = { Bindings: { DB: D1Database; SETUP_CODE?: string }; Variables: { uid: number } }
 const app = new Hono<Env>()
@@ -15,6 +15,7 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS login_attempts (ip TEXT NOT NULL, ts INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS plan (id INTEGER PRIMARY KEY CHECK (id = 1), json TEXT NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS state (user_id INTEGER PRIMARY KEY, json TEXT NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS user_plans (user_id INTEGER PRIMARY KEY, json TEXT NOT NULL, updated_at INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS activities (id TEXT NOT NULL, user_id INTEGER NOT NULL, date TEXT NOT NULL, json TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY (user_id, id))`,
   `CREATE INDEX IF NOT EXISTS idx_act_date ON activities (user_id, date)`,
   `CREATE TABLE IF NOT EXISTS invites (code_hash TEXT PRIMARY KEY, user_id INTEGER, expires_at INTEGER NOT NULL, used_at INTEGER)`,
@@ -144,7 +145,7 @@ const auth = async (c: any, next: any) => {
   if (!s) return c.json({ error: 'Sessione scaduta. Accedi di nuovo.' }, 401)
   c.set('uid', s.user_id); await next()
 }
-for (const p of ['/api/bootstrap', '/api/state', '/api/activities/*', '/api/tests/*', '/api/import', '/api/admin/*']) app.use(p, auth)
+for (const p of ['/api/bootstrap', '/api/state', '/api/custom-plan', '/api/activities/*', '/api/tests/*', '/api/import', '/api/admin/*']) app.use(p, auth)
 app.use('/api/admin/*', async (c, next) => {
   const u = await c.env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(c.get('uid')).first<{ is_admin: number }>()
   if (!u?.is_admin) return c.json({ error: 'Riservato all\'amministratore.' }, 403)
@@ -170,20 +171,22 @@ app.post('/api/admin/invites', async c => {
 app.delete('/api/admin/users/:id', async c => {
   const id = +c.req.param('id'), db = c.env.DB
   if (id === c.get('uid')) return c.json({ error: 'Non puoi eliminare il tuo account.' }, 400)
-  await db.batch(['sessions', 'state', 'activities', 'tests', 'invites'].map(t => db.prepare(`DELETE FROM ${t} WHERE user_id = ?`).bind(id)).concat(db.prepare('DELETE FROM users WHERE id = ?').bind(id)))
+  await db.batch(['sessions', 'state', 'user_plans', 'activities', 'tests', 'invites'].map(t => db.prepare(`DELETE FROM ${t} WHERE user_id = ?`).bind(id)).concat(db.prepare('DELETE FROM users WHERE id = ?').bind(id)))
   return c.json({ ok: true })
 })
 
 const dump = async (db: D1Database, uid: number) => {
-  const [p, s, a, t, u] = await db.batch<any>([
+  const [p, s, a, t, u, x] = await db.batch<any>([
     db.prepare('SELECT json FROM plan WHERE id = 1'),
     db.prepare('SELECT json FROM state WHERE user_id = ?').bind(uid),
     db.prepare('SELECT json FROM activities WHERE user_id = ? ORDER BY date').bind(uid),
     db.prepare('SELECT json FROM tests WHERE user_id = ? ORDER BY date').bind(uid),
     db.prepare('SELECT name, is_admin FROM users WHERE id = ?').bind(uid),
+    db.prepare('SELECT json FROM user_plans WHERE user_id = ?').bind(uid),
   ])
   return {
     plan: JSON.parse(p.results[0].json),
+    custom: x.results[0] ? JSON.parse(x.results[0].json) : null,
     state: s.results[0] ? JSON.parse(s.results[0].json) : defaultState,
     activities: a.results.map((r: any) => JSON.parse(r.json)),
     tests: t.results.map((r: any) => JSON.parse(r.json)),
@@ -194,6 +197,12 @@ app.get('/api/bootstrap', async c => c.json(await dump(c.env.DB, c.get('uid'))))
 const putState = (db: D1Database, uid: number, s: unknown) => db.prepare('INSERT INTO state VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET json = excluded.json').bind(uid, JSON.stringify(s))
 const putAct = (db: D1Database, uid: number, a: any) => db.prepare('INSERT INTO activities VALUES (?, ?, ?, ?, ?) ON CONFLICT(user_id, id) DO UPDATE SET date = excluded.date, json = excluded.json, updated_at = excluded.updated_at').bind(a.id, uid, a.date, JSON.stringify(a), Date.now())
 const putTest = (db: D1Database, uid: number, t: any) => db.prepare('INSERT INTO tests VALUES (?, ?, ?, ?, ?) ON CONFLICT(user_id, id) DO UPDATE SET date = excluded.date, json = excluded.json').bind(t.id, uid, t.date, t.kind, JSON.stringify(t))
+const putPlan = (db: D1Database, uid: number, p: unknown) => db.prepare('INSERT INTO user_plans VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET json = excluded.json, updated_at = excluded.updated_at').bind(uid, JSON.stringify(p), Date.now())
+app.put('/api/custom-plan', async c => {
+  const p = await c.req.json<any>(), e = planError(p)
+  if (e) return c.json({ error: e }, 400)
+  await putPlan(c.env.DB, c.get('uid'), p).run(); return c.json({ ok: true })
+})
 app.put('/api/state', async c => { await putState(c.env.DB, c.get('uid'), await c.req.json()).run(); return c.json({ ok: true }) })
 app.put('/api/activities/:id', async c => {
   const a = await c.req.json<any>()
@@ -205,7 +214,8 @@ app.put('/api/tests/:id', async c => { await putTest(c.env.DB, c.get('uid'), awa
 app.post('/api/import', async c => {
   const d = await c.req.json<any>(), db = c.env.DB, uid = c.get('uid')
   if (!Array.isArray(d.activities) || !d.state) return c.json({ error: 'File di backup non valido.' }, 400)
-  const stm = [putState(db, uid, d.state), ...d.activities.map((a: any) => putAct(db, uid, a)), ...(d.tests ?? []).map((t: any) => putTest(db, uid, t))]
+  if (d.custom && planError(d.custom)) return c.json({ error: 'File di backup non valido.' }, 400)
+  const stm = [putState(db, uid, d.state), ...(d.custom ? [putPlan(db, uid, d.custom)] : []), ...d.activities.map((a: any) => putAct(db, uid, a)), ...(d.tests ?? []).map((t: any) => putTest(db, uid, t))]
   for (let i = 0; i < stm.length; i += 50) await db.batch(stm.slice(i, i + 50))
   return c.json({ ok: true, imported: d.activities.length })
 })

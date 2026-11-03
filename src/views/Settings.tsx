@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
-import { call, clearLocal, data, load, saveState } from '../api'
+import { call, clearLocal, data, load, saveCustomPlan, saveState } from '../api'
 import { Field, Note } from '../ui'
-import type { Activity } from '../../shared/engine'
+import { isCustom, moveRace, planFor, type Activity } from '../../shared/engine'
 
 const save = (name: string, text: string, type: string) => { const u = URL.createObjectURL(new Blob([text], { type })); const a = document.createElement('a'); a.href = u; a.download = name; a.click(); URL.revokeObjectURL(u) }
 const CSV = ['date', 'type', 'source', 'km', 'seconds', 'hrAvg', 'hrMax', 'hrLast', 'splits', 'fiato', 'fatica', 'knee', 'swelling', 'locked', 'note', 'sessionKey'] as const
@@ -40,7 +40,7 @@ function People() {
   </>
 }
 export function Settings({ onLogout }: { onLogout: () => void }) {
-  const d = data.value!, st = d.state
+  const d = data.value!, st = d.state, custom = isCustom(planFor(d))
   const [msg, setMsg] = useState('')
   const f = useRef<HTMLInputElement>(null)
   const stamp = new Date().toISOString().slice(0, 10)
@@ -52,16 +52,23 @@ export function Settings({ onLogout }: { onLogout: () => void }) {
   return (
     <div class="stack form">
       <section class="head"><h1>Impostazioni</h1></section>
+      <h2 class="phase">Piano</h2>
+      <a class="btn ghost" href="#/mio-piano">{custom ? d.custom!.meta.name : 'Piano base'}: cambia o crea il tuo</a>
       <h2 class="phase">Calendario</h2>
       <Field label="Inizio del piano"><input type="date" value={st.startDate} onChange={e => saveState({ ...st, startDate: e.currentTarget.value })} /></Field>
-      <Field label="Settimana di partenza"><input type="number" min={1} max={34} value={st.startWeek} onChange={e => saveState({ ...st, startWeek: Math.min(34, Math.max(1, +e.currentTarget.value || 1)) })} /></Field>
+      {!custom && <Field label="Settimana di partenza"><input type="number" min={1} max={34} value={st.startWeek} onChange={e => saveState({ ...st, startWeek: Math.min(34, Math.max(1, +e.currentTarget.value || 1)) })} /></Field>}
       <h2 class="phase">Gara</h2>
-      <Field label="Data della maratona"><input type="date" value={st.raceDate ?? ''} onChange={e => saveState({ ...st, raceDate: e.currentTarget.value || null })} /></Field>
+      <Field label={custom ? 'Data della gara' : 'Data della maratona'}><input type="date" value={st.raceDate ?? ''} onChange={e => {
+        const v = e.currentTarget.value || null
+        if (!custom) { saveState({ ...st, raceDate: v }); return }
+        const m = moveRace(d.custom!, st, v); saveCustomPlan(m.plan); saveState(m.state)
+      }} /></Field>
+      {custom && <p class="sub pad">Se cambi la data, tutto il calendario si sposta con la gara.</p>}
       <Field label="Nome della gara"><input value={st.raceName ?? ''} onChange={e => saveState({ ...st, raceName: e.currentTarget.value || null })} /></Field>
       <h2 class="phase">Backup</h2>
       <p class="sub pad">Scarica un backup ogni mese: il piano gratuito non è un archivio garantito.</p>
       <div class="row">
-        <button class="btn ghost" type="button" onClick={() => save(`backtorun-${stamp}.json`, JSON.stringify({ state: d.state, activities: d.activities, tests: d.tests }), 'application/json')}>Scarica backup</button>
+        <button class="btn ghost" type="button" onClick={() => save(`backtorun-${stamp}.json`, JSON.stringify({ state: d.state, custom: d.custom ?? null, activities: d.activities, tests: d.tests }), 'application/json')}>Scarica backup</button>
         <button class="btn ghost" type="button" onClick={() => save(`backtorun-${stamp}.csv`, '﻿' + csv(d.activities), 'text/csv')}>Scarica CSV</button>
       </div>
       <input ref={f} type="file" accept=".json" hidden onChange={e => restore(e.currentTarget.files?.[0])} />

@@ -2,6 +2,8 @@
 
 La tua app di preparazione alla maratona: piano, fiato e fatica attesi, registrazione manuale o da file FIT, lavori extra, test e andamento.
 
+Ogni persona può usare il piano base, creare un piano per la propria gara (distanza, data, livello, giorni) oppure scrivere la propria tabella. Il piano personale sta in `user_plans`; il piano base resta quello di `shared/plan.json`. Il generatore è in `shared/generator.ts`.
+
 Gira gratis su Cloudflare (Workers e D1). Tempo stimato per la pubblicazione: 15 minuti.
 
 ## Pubblicazione

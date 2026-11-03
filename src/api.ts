@@ -1,7 +1,7 @@
 import { signal } from '@preact/signals'
-import type { Activity, Plan, State } from '../shared/engine'
+import { defaultState, normalizePlan, type Activity, type Plan, type State } from '../shared/engine'
 export interface TestRec { id: string; date: string; kind: string; data: any }
-export interface Data { plan: Plan; state: State; activities: Activity[]; tests: TestRec[]; me?: { name: string; isAdmin: boolean } }
+export interface Data { plan: Plan; custom?: Plan | null; state: State; activities: Activity[]; tests: TestRec[]; me?: { name: string; isAdmin: boolean } }
 export const data = signal<Data | null>(null)
 export const pending = signal(0)
 export const online = signal(typeof navigator === 'undefined' ? true : navigator.onLine)
@@ -55,6 +55,26 @@ export function deleteActivity(id: string) {
   enqueue({ method: 'DELETE', url: `/api/activities/${id}` })
 }
 export function saveState(s: State) { commit({ ...data.value!, state: s }); enqueue({ method: 'PUT', url: '/api/state', body: s }) }
+const core = ({ other, ...s }: State) => s
+const nextMonday = () => { const d = new Date(); d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7)); return new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10) }
+/** Passa da un piano all'altro: ognuno conserva il proprio calendario. */
+export function switchPlan(mode: 'base' | 'custom') {
+  const st = data.value!.state
+  if ((st.mode ?? 'base') === mode) { if (!st.mode) saveState({ ...st, mode }); return }
+  saveState({ ...defaultState, startDate: nextMonday(), ...st.other, mode, other: core(st) })
+}
+export function saveCustomPlan(p: Plan) {
+  const plan = normalizePlan(p)
+  commit({ ...data.value!, custom: plan })
+  enqueue({ method: 'PUT', url: '/api/custom-plan', body: plan })
+  return plan
+}
+/** Attiva un piano appena creato e ne fissa il calendario. */
+export function startCustomPlan(p: Plan, s: Pick<State, 'startDate' | 'raceDate' | 'raceName'>) {
+  const st = data.value!.state, plan = saveCustomPlan(p)
+  saveState({ ...s, startWeek: 1, skips: [], repeats: [], mode: 'custom', other: st.mode === 'custom' ? st.other : core(st) })
+  return plan
+}
 export function saveTest(t: TestRec) {
   const d = data.value!
   commit({ ...d, tests: [...d.tests.filter(x => x.id !== t.id), t] })

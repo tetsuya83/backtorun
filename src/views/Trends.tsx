@@ -1,6 +1,6 @@
 import { data } from '../api'
-import { addDays, buildTimeline, sessionKey, upper, type Slot } from '../../shared/engine'
-import { fmtDate, todayISO } from '../guide'
+import { addDays, buildTimeline, isCustom, planFor, sessionKey, upper, type Slot } from '../../shared/engine'
+import { fmtDate, painWords, todayISO } from '../guide'
 import { paceOf } from '../fit'
 
 const W = 340
@@ -29,12 +29,12 @@ function Line({ pts, title, max, min = 0, unit, ref2 }: { pts: { label: string; 
     </svg></figure>
 }
 export function Trends() {
-  const d = data.value!, t = buildTimeline(d.plan, d.state), today = todayISO()
+  const d = data.value!, plan = planFor(d), t = buildTimeline(plan, d.state), today = todayISO()
   const runs = d.activities.filter(a => a.type === 'corsa')
   const totKm = runs.reduce((s, a) => s + (a.km ?? 0), 0)
   const extra = d.activities.filter(a => a.type !== 'corsa').length
   if (!d.activities.length) return <div class="stack"><section class="head"><h1>Andamento</h1><p>Registra il primo allenamento e qui vedrai come cresci settimana dopo settimana.</p><a class="btn" href="#/registra">Registra allenamento</a></section></div>
-  const cur = t.slots.findIndex(s => today < addDays(s.monday, 7))
+  const found = t.slots.findIndex(s => today < addDays(s.monday, 7)), cur = found < 0 ? t.slots.length - 1 : found
   const end = Math.max(cur, 0) + 1
   const win: Slot[] = t.slots.slice(Math.max(0, end - 12), end)
   const rows = win.map(s => ({ label: fmtDate(s.monday, { day: 'numeric', month: 'numeric' }), plan: s.total ? Math.round(s.total) : null, done: Math.round(runs.filter(a => a.date >= s.monday && a.date < addDays(s.monday, 7)).reduce((x, a) => x + (a.km ?? 0), 0) * 10) / 10 }))
@@ -52,7 +52,7 @@ export function Trends() {
       </section>
       <Bars rows={rows} title="Chilometri a settimana, fatti su previsti" unit="km" />
       {fat.length > 1 && <Line pts={fat} max={10} title="Fatica reale e attesa" unit="/10" />}
-      {knee.length > 1 && <Line pts={knee} max={10} title="Dolore al ginocchio" unit="/10" ref2={2} />}
+      {knee.length > 1 && <Line pts={knee} max={10} title={painWords(isCustom(plan)).chart} unit="/10" ref2={2} />}
       {eff.length > 1 && <><Line pts={eff.map(e => ({ ...e }))} min={best - 30} max={Math.max(...eff.map(e => e.v)) + 15} title="Ritmo in Z2, più basso è meglio" unit=" s/km" /><p class="sub pad">Miglior ritmo con FC media in Z2: {paceOf(1, best)}.</p></>}
     </div>
   )

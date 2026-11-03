@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { data, deleteActivity, saveActivity, uid } from '../api'
-import { buildTimeline, sessionDate, sessionKey, type Activity } from '../../shared/engine'
-import { fmtDate, todayISO, WEEKDAY } from '../guide'
+import { buildTimeline, isCustom, planFor, sessionDate, sessionKey, type Activity } from '../../shared/engine'
+import { fmtDate, painWords, todayISO, WEEKDAY } from '../guide'
 import { breathHint, Field, Gauge, nav, Note, Scale } from '../ui'
 import { paceOf, parseFit, timeOf, type FitResult } from '../fit'
 
@@ -12,7 +12,8 @@ const num = (v: string) => v === '' ? null : +v.replace(',', '.')
 
 export function Log({ route }: { route: string }) {
   const d = data.value!, q = new URLSearchParams(route.split('?')[1] ?? '')
-  const t = useMemo(() => buildTimeline(d.plan, d.state), [d.plan, d.state])
+  const plan = planFor(d), words = painWords(isCustom(plan))
+  const t = useMemo(() => buildTimeline(plan, d.state), [plan, d.state])
   const existing = d.activities.find(a => a.id === q.get('id'))
   const blank = (): Activity => ({ id: uid(), date: q.get('date') ?? todayISO(), type: (q.get('type') as Activity['type']) ?? 'corsa', sessionKey: q.get('key'), source: 'manuale' })
   const [a, setA] = useState<Activity>(existing ?? blank())
@@ -81,8 +82,8 @@ export function Log({ route }: { route: string }) {
       {isRun && <Field label="Intertempi"><input value={a.splits ?? ''} onInput={e => up({ splits: e.currentTarget.value })} placeholder={`6'29" - 6'16"`} /></Field>}
       {isRun && <Scale label="Com'era il fiato?" max={5} value={a.fiato} onChange={v => up({ fiato: v })} hint={breathHint(a.fiato)} />}
       <Scale label="Quanta fatica?" max={10} value={a.fatica} onChange={v => up({ fatica: v })} />
-      {isRun && <Scale label="Dolore al ginocchio" min={0} max={10} value={a.knee} onChange={v => up({ knee: v })} />}
-      {isRun && <label class="check"><input type="checkbox" checked={!!a.locked} onChange={e => up({ locked: e.currentTarget.checked })} /> Il ginocchio si è bloccato o ha ceduto</label>}
+      {isRun && <Scale label={words.pain} min={0} max={10} value={a.knee} onChange={v => up({ knee: v })} />}
+      {isRun && <label class="check"><input type="checkbox" checked={!!a.locked} onChange={e => up({ locked: e.currentTarget.checked })} /> {words.locked}</label>}
       <Field label="Note"><textarea rows={3} value={a.note ?? ''} onInput={e => up({ note: e.currentTarget.value })} placeholder={isRun ? 'Sonno, freddo, intestino, sensazioni' : 'Esercizi, carichi, sensazioni'} /></Field>
       {err && <p class="err" role="alert">{err}</p>}
       <button class="btn" disabled={saved}>{saved ? 'Salvato' : 'Salva allenamento'}</button>

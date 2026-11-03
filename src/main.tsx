@@ -13,6 +13,7 @@ import { Log } from './views/Log'
 import { Trends } from './views/Trends'
 import { Tests } from './views/Tests'
 import { Settings } from './views/Settings'
+import { BlankPlan, EditPlan, MyPlan, NewPlan } from './views/MyPlan'
 
 const TABS = [
   ['oggi', 'Oggi', 'M4 13h6l2-7 4 13 2-6h2'],
@@ -46,7 +47,9 @@ function App() {
   if (auth === 'error') return <div class="splash"><Logo /><p>Serve la connessione per il primo avvio.</p><button class="btn" onClick={start}>Riprova</button></div>
   if (auth !== 'in') return <Login setup={auth === 'setup'} done={start} />
   if (!data.value) return null
-  const base = route.split('?')[0]
+  const asked = route.split('?')[0]
+  // chi arriva su invito sceglie il piano al primo accesso
+  const base = !data.value.state.mode && !data.value.me?.isAdmin && !asked.startsWith('mio-piano') ? 'mio-piano' : asked
   return (
     <div class="app">
       <header class="top">
@@ -64,6 +67,10 @@ function App() {
         {base.startsWith('registra') && <Log route={route} />}
         {base === 'andamento' && <Trends />}
         {base === 'test' && <Tests />}
+        {base === 'mio-piano' && <MyPlan />}
+        {base === 'mio-piano/nuovo' && <NewPlan />}
+        {base === 'mio-piano/tabella' && <BlankPlan />}
+        {base === 'mio-piano/modifica' && <EditPlan />}
         {base === 'impostazioni' && <Settings onLogout={() => setAuth('login')} />}
       </main>
       <nav class="tabs">
