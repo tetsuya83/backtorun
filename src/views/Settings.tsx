@@ -5,7 +5,8 @@ import { isCustom, moveRace, planFor, type Activity } from '../../shared/engine'
 
 const save = (name: string, text: string, type: string) => { const u = URL.createObjectURL(new Blob([text], { type })); const a = document.createElement('a'); a.href = u; a.download = name; a.click(); URL.revokeObjectURL(u) }
 const CSV = ['date', 'type', 'source', 'km', 'seconds', 'hrAvg', 'hrMax', 'hrLast', 'splits', 'fiato', 'fatica', 'knee', 'swelling', 'locked', 'note', 'sessionKey'] as const
-const csv = (l: Activity[]) => [CSV.join(';'), ...l.map(a => CSV.map(k => { const v = a[k]; return v == null ? '' : `"${String(v).replace(/"/g, '""')}"` }).join(';'))].join('\n')
+const scheda = (a: Activity) => (a.sets ?? []).map(x => `${x.name}: ${x.sets.map(s => (s.kg ? `${s.kg}kg×` : '') + s.reps).join(' ')}`).join(' | ')
+const csv = (l: Activity[]) => [[...CSV, 'scheda'].join(';'), ...l.map(a => [...CSV.map(k => a[k]), scheda(a) || null].map(v => v == null ? '' : `"${String(v).replace(/"/g, '""')}"`).join(';'))].join('\n')
 interface Person { id: number; name: string; isAdmin: number; activities: number }
 function People() {
   const [info, setInfo] = useState<{ users: Person[]; openInvites: number; max: number } | null>(null)

@@ -1,4 +1,7 @@
+import { useState } from 'preact/hooks'
 import { data } from '../api'
+import { topKg } from '../../shared/training'
+import { Field } from '../ui'
 import { addDays, buildTimeline, isCustom, planFor, sessionKey, upper, type Slot } from '../../shared/engine'
 import { fmtDate, painWords, todayISO } from '../guide'
 import { paceOf } from '../fit'
@@ -28,6 +31,16 @@ function Line({ pts, title, max, min = 0, unit, ref2 }: { pts: { label: string; 
       <text x="2" y={h + 15} class="tick">{pts[0]?.label}</text><text x={W - 2} y={h + 15} text-anchor="end" class="tick">{pts.at(-1)?.label}</text>
     </svg></figure>
 }
+function Loads() {
+  const acts = data.value!.activities.filter(a => a.sets?.length)
+  const names = new Map(acts.flatMap(a => a.sets!.filter(x => topKg(x) > 0).map(x => [x.id, x.name] as const)))
+  const [sel, setSel] = useState<string | null>(null), id = sel ?? [...names.keys()][0]
+  if (!id) return null
+  const pts = acts.flatMap(a => { const l = a.sets!.find(x => x.id === id); return l && topKg(l) ? [{ label: fmtDate(a.date, { day: 'numeric', month: 'short' }), v: topKg(l) }] : [] }).slice(-16)
+  const vs = pts.map(p => p.v), lo = Math.min(...vs), hi = Math.max(...vs)
+  return <section class="stack"><Field label="Carico per esercizio"><select value={id} onChange={e => setSel(e.currentTarget.value)}>{[...names].map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></Field>
+    {pts.length > 1 ? <Line pts={pts} min={Math.max(0, lo - 5)} max={hi + 5} title={`${names.get(id)}, carico massimo`} unit=" kg" /> : <p class="sub pad">Serve una seconda seduta per vedere l'andamento.</p>}</section>
+}
 export function Trends() {
   const d = data.value!, plan = planFor(d), t = buildTimeline(plan, d.state), today = todayISO()
   const runs = d.activities.filter(a => a.type === 'corsa')
@@ -53,6 +66,7 @@ export function Trends() {
       <Bars rows={rows} title="Chilometri a settimana, fatti su previsti" unit="km" />
       {fat.length > 1 && <Line pts={fat} max={10} title="Fatica reale e attesa" unit="/10" />}
       {knee.length > 1 && <Line pts={knee} max={10} title={painWords(isCustom(plan)).chart} unit="/10" ref2={2} />}
+      <Loads />
       {eff.length > 1 && <><Line pts={eff.map(e => ({ ...e }))} min={best - 30} max={Math.max(...eff.map(e => e.v)) + 15} title="Ritmo in Z2, più basso è meglio" unit=" s/km" /><p class="sub pad">Miglior ritmo con FC media in Z2: {paceOf(1, best)}.</p></>}
     </div>
   )

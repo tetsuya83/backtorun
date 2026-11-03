@@ -60,3 +60,13 @@ input,select,textarea{width:100%;background:var(--deep);border:2px solid var(--l
 .seg.race{display:grid;grid-template-columns:1fr 1fr}.seg.race button{flex:none;min-height:52px}
 .ses.edit{gap:10px}.ses.edit .link{align-self:flex-start}
 .savebar{position:sticky;bottom:calc(72px + env(safe-area-inset-bottom));background:var(--night);padding:8px 0}
+
+.ex-h{display:flex;justify-content:space-between;gap:10px;align-items:baseline}.ex-h span{color:var(--mist);font:600 18px/1 var(--cond)}.done-ex{border-left:5px solid var(--go)}.panel .up{color:var(--go)}
+.sets{display:flex;flex-direction:column;gap:6px}.set{display:grid;grid-template-columns:22px 1fr 1fr 54px;gap:6px;align-items:center}.set b{font:700 20px/1 var(--cond);color:var(--mist)}.set input{min-width:0;min-height:48px;padding:8px;text-align:center}
+.set button{min-height:48px;background:var(--deep);border:2px solid var(--line);border-radius:var(--r);cursor:pointer;font:700 24px/1 var(--cond);color:var(--ink)}.set.on button{background:var(--go);border-color:var(--go)}
+.sets-sum{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;font-size:15px}.sets-sum b{font-weight:600}
+.strength-v{padding-bottom:84px}.restbar{position:fixed;left:0;right:0;bottom:calc(68px + env(safe-area-inset-bottom));z-index:6;max-width:560px;margin:0 auto;display:grid;grid-template-columns:auto 1fr 64px 72px;gap:8px;align-items:center;background:var(--vest);color:var(--ink);padding:8px 12px}
+.restbar b{font:700 38px/1 var(--cond)}.restbar .btn{min-height:46px;padding:4px;font-size:17px;color:var(--ink);border-color:var(--ink)}
+.tm{display:flex;flex-direction:column;gap:10px;padding:12px 0}.tm-label{font:700 54px/1 var(--cond);overflow-wrap:anywhere}.tm-time{font:700 112px/.95 var(--cond);color:var(--vest);font-variant-numeric:tabular-nums}.tm-cue{color:#CFDEDC}
+[data-tone=rest] .tm-time{color:var(--go)}[data-tone=rest] .tm-bar i{background:var(--go)}.tm-bar{height:10px;background:var(--line)}.tm-bar i{display:block;height:100%;background:var(--vest)}
+.veil{position:fixed;inset:0;z-index:20;display:flex;align-items:flex-end;padding:16px 16px calc(92px + env(safe-area-inset-bottom));touch-action:none}.hold{background:var(--deep);user-select:none;-webkit-user-select:none;touch-action:none}

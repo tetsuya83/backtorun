@@ -44,3 +44,7 @@ In **Impostazioni** puoi scaricare un backup JSON e un CSV. Fai un backup al mes
     npm test
 
 La libreria FIT di Garmin ha una propria licenza: `node_modules/@garmin/fitsdk/LICENSE.txt`.
+
+## Forza, timer e routine
+
+La logica sta in `shared/training.ts`, senza chiamate esterne. La scheda di forza (`#/forza`) traduce in numeri gli schemi del piano, salva le serie dentro l'attività (`sets`) e tiene la seduta aperta sul telefono finché non viene salvata. Il timer (`#/timer`) e le routine (`#/routine`) calcolano tutto dall'orologio e programmano in anticipo i suoni.

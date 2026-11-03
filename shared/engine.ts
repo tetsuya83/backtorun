@@ -1,3 +1,4 @@
+import type { ExerciseLog } from './training'
 export type Day = 'lun' | 'mar' | 'mer' | 'gio' | 'ven' | 'sab' | 'dom'
 export const DAYS: Day[] = ['lun', 'mar', 'mer', 'gio', 'ven', 'sab', 'dom']
 export interface Session { day: Day; text: string; km: number | null; fiato?: string | null; fatica?: string | null; race?: boolean }
@@ -9,7 +10,7 @@ export interface Activity {
   id: string; date: string; type: 'corsa' | 'forza' | 'nuoto' | 'bici' | 'altro'; sessionKey?: string | null; source: 'manuale' | 'fit'
   km?: number | null; seconds?: number | null; hrAvg?: number | null; hrMax?: number | null; hrLast?: number | null
   splits?: string | null; fiato?: number | null; fatica?: number | null; knee?: number | null; swelling?: boolean | null; locked?: boolean | null
-  note?: string | null; trace?: [number, number | null, number | null][] | null; updatedAt?: number
+  note?: string | null; trace?: [number, number | null, number | null][] | null; sets?: ExerciseLog[] | null; updatedAt?: number
 }
 export interface Slot extends Week { monday: string; key: string; maintenance?: boolean; occurrence: number }
 

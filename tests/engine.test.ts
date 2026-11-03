@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import plan from '../shared/plan.json'
 import { buildTimeline, defaultState, moveRace, planError, planFor, reviewWeek, scalaResult, sessionDate, slotForDate, sessionKey, strengthDays, type Day, type Plan, type Activity, type ScalaRound } from '../shared/engine'
+import { cooldownFor, intervalSteps, jointOk, parseIntervals, ROUTINES, schemeFor, stepAt, suggest, totalOf, warmupFor, WORKOUTS, type ExerciseLog } from '../shared/training'
 import { blankPlan, generatePlan, type GoalInput, type RaceType } from '../shared/generator'
 const P = plan as unknown as Plan
 describe('calendario', () => {
@@ -127,5 +128,59 @@ describe('piano personale', () => {
     expect(planFor({ plan: P, custom: blankPlan('b', 'Mia', 2), state: defaultState })).toBe(P)
     expect(strengthDays(P)).toEqual(['lun', 'gio'])
     expect(buildTimeline(P, defaultState).slots[0].key).toBe('w1.0')
+  })
+})
+
+describe('forza guidata', () => {
+  const lp = WORKOUTS.palestra[0], hip = WORKOUTS.palestra[3], s = schemeFor(lp, 2, false, 'palestra')
+  const log = (reps: number[], kg = 100, max = s.max): ExerciseLog => ({ id: 'legpress', name: 'Leg press', kind: 'load', min: 6, max, sets: reps.map(r => ({ kg, reps: r })) })
+  it('rispetta gli schemi del piano', () => {
+    expect(schemeFor(lp, 0, false, 'palestra')).toMatchObject({ sets: 3, min: 8, max: 12 })
+    expect(s).toMatchObject({ sets: 4, min: 6, max: 8, rest: 120 })
+    expect(schemeFor(lp, 2, true, 'palestra').sets).toBe(3)
+    expect(schemeFor(WORKOUTS.palestra[2], 4, true, 'palestra').sets).toBe(2)
+    expect(schemeFor(WORKOUTS.palestra.at(-1)!, 9, false, 'casa')).toMatchObject({ unit: 'sec' })
+  })
+  it('alza il carico solo con tutte le serie al massimo e articolazioni a posto', () => {
+    expect(suggest(log([8, 8, 8, 8]), lp, s, true)).toMatchObject({ kg: 105, up: true })
+    expect(suggest(log([8, 8, 8, 7]), lp, s, true)).toMatchObject({ kg: 100, up: false })
+    expect(suggest(log([8, 8, 8]), lp, s, true).up).toBe(false)
+    expect(suggest(log([8, 8, 8, 8]), lp, s, false)).toMatchObject({ kg: 100, up: false })
+    expect(suggest(log([12, 12, 12, 12], 100, 12), lp, s, true)).toMatchObject({ kg: 100, up: false })
+    expect(suggest({ ...log([8, 8, 8, 8]), id: 'hipthrust' }, hip, s, true).kg).toBe(102.5)
+    expect(suggest(null, lp, s, true).kg).toBeNull()
+  })
+  it('gonfiore, blocco o dolore fermano gli aumenti', () => {
+    const r = (p: Partial<Activity>): Activity => ({ id: 'a', date: '2026-11-10', type: 'corsa', source: 'manuale', ...p })
+    expect(jointOk([])).toBe(true); expect(jointOk([r({ knee: 2 })])).toBe(true); expect(jointOk([r({ knee: 3 })])).toBe(false)
+    expect(jointOk([r({ swelling: true })])).toBe(false); expect(jointOk([r({ locked: true })])).toBe(false)
+    expect(jointOk([r({ knee: 1 }), r({ type: 'forza', knee: 4 })])).toBe(false)
+    expect(jointOk([r({ knee: 5 }), r({ knee: 0 })])).toBe(true)
+  })
+  it('ogni esercizio ha un id unico per luogo', () => {
+    for (const l of Object.values(WORKOUTS)) { const ids = l.flatMap(e => [e.id, ...(e.alt ? [e.alt.id] : [])]); expect(new Set(ids).size).toBe(ids.length) }
+  })
+})
+describe('timer', () => {
+  it('legge tutte le sedute a tempo del piano', () => {
+    expect(parseIntervals(`6×[1' corsa + 2' cammino]`)).toMatchObject({ reps: 6, work: 60, rest: 120, workLabel: 'Corri', restLabel: 'Cammina', partial: false })
+    expect(parseIntervals(`8×[1' corsa + 1'30" cammino]`)).toMatchObject({ reps: 8, rest: 90 })
+    expect(parseIntervals(`Interval: 5×[3' Z4 + 2' facile] (8 km)`)).toMatchObject({ workLabel: 'Forte', restLabel: 'Recupera', detail: 'Z4', partial: true })
+    expect(parseIntervals(`Salite: 8×20" controllate + 2' rec (6 km)`)).toMatchObject({ reps: 8, work: 20, rest: 120 })
+    expect(parseIntervals(`Ripetute: 5×[1 km Z4 + 2' facile] (9 km)`)).toBeNull()
+    expect(parseIntervals('Facile 5 km + 4 allunghi')).toBeNull()
+    const all = (P.weeks).flatMap(w => w.sessions).filter(s => /×/.test(s.text))
+    expect(all.filter(s => /corsa \+/.test(s.text)).every(s => parseIntervals(s.text))).toBe(true)
+  })
+  it('ricava il passo dal tempo trascorso', () => {
+    const st = intervalSteps(parseIntervals(`2×[1' corsa + 2' cammino]`)!)
+    expect(totalOf(st)).toBe(360); expect(stepAt(st, 0)).toMatchObject({ i: 0, left: 60 }); expect(stepAt(st, 61)).toMatchObject({ i: 1, left: 119 })
+    expect(stepAt(st, 180)).toMatchObject({ i: 2, start: 180 }); expect(stepAt(st, 360).done).toBe(true); expect(stepAt(st, 9999).done).toBe(true)
+  })
+  it('sceglie riscaldamento e defaticamento dalla seduta', () => {
+    expect(warmupFor(`6×[1' corsa + 2' cammino]`).id).toBe('warm-easy'); expect(warmupFor('Facile 6 km').id).toBe('warm-easy')
+    expect(warmupFor('Facile 6 km + 4 allunghi').id).toBe('warm-work'); expect(warmupFor('Ripetute: 5×[1 km Z4 + 2\' facile] (9 km)').id).toBe('warm-work')
+    expect(cooldownFor('Facile 6 km', 6).id).toBe('cool-run'); expect(cooldownFor('Lungo 18 km', 18).id).toBe('cool-long')
+    for (const r of ROUTINES) { const m = totalOf(r.steps) / 60; expect(m).toBeGreaterThan(2); expect(m).toBeLessThan(16) }
   })
 })

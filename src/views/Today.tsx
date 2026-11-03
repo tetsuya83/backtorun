@@ -3,12 +3,15 @@ import { addDays, buildTimeline, DAYS, isCustom, planFor, reviewWeek, sessionDat
 import { fmtDate, MONTHS, painWords, STRENGTH, STRENGTH_LIST, todayISO } from '../guide'
 import { Gauge, Note } from '../ui'
 import { paceOf, timeOf } from '../fit'
+import { cooldownFor, parseIntervals, routineById, totalOf, warmupFor, type Routine } from '../../shared/training'
 
 export const phaseName = (plan: Plan, p: number) => plan.meta.phases[String(p)] ?? 'Piano'
 export const weekLabel = (s: Slot) => s.maintenance ? 'Mantenimento' : `Settimana ${s.week}`
 
+const mins = (r: Routine) => `${Math.round(totalOf(r.steps) / 60)} min`
 function SessionHero({ s, date, done, label }: { s: Slot; date: string; done?: Activity; label: string }) {
   const ses = s.sessions.find(x => sessionDate(s, x.day) === date)!
+  const iv = parseIntervals(ses.text), warm = warmupFor(ses.text), cool = cooldownFor(ses.text, ses.km), run = ses.km !== 0
   return (
     <section class="hero">
       <p class="eyebrow">{label}</p>
@@ -17,7 +20,12 @@ function SessionHero({ s, date, done, label }: { s: Slot; date: string; done?: A
       <Gauge fiato={ses.fiato} fatica={ses.fatica} />
       {done
         ? <div class="done"><strong>Registrato</strong><span>{[done.km ? done.km + ' km' : null, timeOf(done.seconds), paceOf(done.km, done.seconds), done.fatica ? `fatica ${done.fatica}` : null].filter(Boolean).join(', ')}</span><a href={`#/registra?id=${done.id}`}>Modifica</a></div>
-        : <a class="btn" href={`#/registra?key=${sessionKey(s, ses.day)}&date=${date}`}>Registra allenamento</a>}
+        : <>
+          {run && <a class="btn ghost" href={`#/routine?id=${warm.id}`}>{warm.name}, {mins(warm)}</a>}
+          {iv && <a class="btn ghost" href={`#/timer?key=${sessionKey(s, ses.day)}&date=${date}&text=${encodeURIComponent(ses.text)}`}>Avvia il timer</a>}
+          <a class="btn" href={`#/registra?key=${sessionKey(s, ses.day)}&date=${date}`}>Registra allenamento</a>
+        </>}
+      {done && <a class="btn ghost" href={`#/routine?id=${cool.id}`}>{cool.name}, {mins(cool)}</a>}
     </section>
   )
 }
@@ -43,6 +51,7 @@ export function Today() {
   const nextDate = t.slots.flatMap(s => s.sessions.map(x => sessionDate(s, x.day))).filter(x => x > today).sort()[0] ?? null
   const nextSlot = nextDate ? slotForDate(t, nextDate) : null
   const isStrength = strengthDays(plan).includes(DAYS[(wd + 6) % 7])
+  const gymDone = d.activities.find(a => a.type === 'forza' && a.date === today)
   return (
     <div class="stack">
       {!started && <section class="hero">
@@ -65,7 +74,11 @@ export function Today() {
         <p class="eyebrow">{weekLabel(slot)}, {phaseName(plan, slot.phase)}</p>
         <h1>{isStrength ? 'Oggi forza' : 'Oggi niente corsa'}</h1>
         <p>{isStrength ? `${STRENGTH[String(slot.phase)] ?? STRENGTH['1']}. ${STRENGTH_LIST}` : wd === 6 ? 'Nuoto o bici facili, se ti va.' : 'Riposo o nuoto facile.'}</p>
-        {isStrength && <a class="btn" href={`#/registra?type=forza&date=${today}`}>Registra forza</a>}
+        {isStrength && (gymDone ? <div class="done"><strong>Registrato</strong><span>{gymDone.sets?.length ? `${gymDone.sets.length} esercizi` : 'Forza'}{gymDone.fatica ? `, fatica ${gymDone.fatica}` : ''}</span></div> : <>
+          <a class="btn" href={`#/forza?date=${today}`}>Inizia la forza</a>
+          <a class="btn ghost" href={`#/registra?type=forza&date=${today}`}>Registra senza scheda</a>
+        </>)}
+        {!isStrength && <a class="btn ghost" href="#/routine?id=mobility">Mobilità, {mins(routineById('mobility')!)}</a>}
       </section>}
       {started && !slot && <section class="hero rest">
         <p class="eyebrow">Piano concluso</p>
@@ -82,6 +95,7 @@ export function Today() {
         <h2>Prossima corsa: {fmtDate(nextDate, { weekday: 'long', day: 'numeric' })}</h2>
         <p>{nextSlot.sessions.find(x => sessionDate(nextSlot, x.day) === nextDate)?.text}</p>
       </section>}
+      <a class="btn ghost" href="#/routine">Routine e timer libero</a>
       <section class="panel quiet">
         <h2>{mn} in zona Milano: {temp}</h2>
         <p>{tip} Valori medi di Milano.</p>

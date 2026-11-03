@@ -17,7 +17,7 @@ export function Log({ route }: { route: string }) {
   const existing = d.activities.find(a => a.id === q.get('id'))
   const blank = (): Activity => ({ id: uid(), date: q.get('date') ?? todayISO(), type: (q.get('type') as Activity['type']) ?? 'corsa', sessionKey: q.get('key'), source: 'manuale' })
   const [a, setA] = useState<Activity>(existing ?? blank())
-  const [dur, setDur] = useState(fromSec(existing?.seconds))
+  const [dur, setDur] = useState(fromSec(existing?.seconds ?? (q.get('sec') ? +q.get('sec')! : null)))
   const [msg, setMsg] = useState(''), [err, setErr] = useState(''), [saved, setSaved] = useState(false)
   const file = useRef<HTMLInputElement>(null)
   const up = (p: Partial<Activity>) => setA(x => ({ ...x, ...p }))
@@ -66,6 +66,8 @@ export function Log({ route }: { route: string }) {
         <input ref={file} type="file" accept=".fit,application/octet-stream" hidden onChange={e => onFile(e.currentTarget.files?.[0])} />
         <button type="button" class="btn ghost" onClick={() => file.current?.click()}>Carica file FIT</button></section>}
       {msg && <Note tone="go">{msg}</Note>}
+      {a.type === 'forza' && !existing && <a class="btn ghost" href={`#/forza?date=${a.date}`}>Usa la scheda guidata</a>}
+      {!!a.sets?.length && <section class="panel"><h2>Scheda</h2><ul class="sets-sum">{a.sets.map(x => <li key={x.id}><b>{x.name}</b> {x.sets.map(s => (s.kg ? `${s.kg} kg × ` : '') + s.reps).join(', ')}</li>)}</ul></section>}
       <div class="seg" role="group" aria-label="Tipo di attività">{TYPES.map(([id, l]) => <button type="button" key={id} class={a.type === id ? 'sel' : ''} aria-pressed={a.type === id} onClick={() => up({ type: id })}>{l}</button>)}</div>
       <Field label="Data"><input type="date" value={a.date} onInput={e => up({ date: e.currentTarget.value, sessionKey: null })} required /></Field>
       {isRun && near.length > 0 && <Field label="Seduta del piano"><select value={a.sessionKey ?? ''} onChange={e => up({ sessionKey: e.currentTarget.value || null })}><option value="">Corsa extra</option>{near.map(o => <option key={o.key} value={o.key}>{o.x.text}</option>)}</select></Field>}

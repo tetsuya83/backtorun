@@ -13,6 +13,8 @@ import { Log } from './views/Log'
 import { Trends } from './views/Trends'
 import { Tests } from './views/Tests'
 import { Settings } from './views/Settings'
+import { Strength } from './views/Strength'
+import { RoutineView, TimerView } from './views/Timer'
 import { BlankPlan, EditPlan, MyPlan, NewPlan } from './views/MyPlan'
 
 const TABS = [
@@ -67,6 +69,9 @@ function App() {
         {base.startsWith('registra') && <Log route={route} />}
         {base === 'andamento' && <Trends />}
         {base === 'test' && <Tests />}
+        {base === 'forza' && <Strength key={route} route={route} />}
+        {base === 'timer' && <TimerView key={route} route={route} />}
+        {base === 'routine' && <RoutineView key={route} route={route} />}
         {base === 'mio-piano' && <MyPlan />}
         {base === 'mio-piano/nuovo' && <NewPlan />}
         {base === 'mio-piano/tabella' && <BlankPlan />}
