@@ -14,6 +14,7 @@ import { Trends } from './views/Trends'
 import { Tests } from './views/Tests'
 import { Settings } from './views/Settings'
 import { Strength } from './views/Strength'
+import { RunView } from './views/Run'
 import { RoutineView, TimerView } from './views/Timer'
 import { BlankPlan, EditPlan, MyPlan, NewPlan } from './views/MyPlan'
 
@@ -69,6 +70,7 @@ function App() {
         {base.startsWith('registra') && <Log route={route} />}
         {base === 'andamento' && <Trends />}
         {base === 'test' && <Tests />}
+        {base === 'corsa' && <RunView route={route} />}
         {base === 'forza' && <Strength key={route} route={route} />}
         {base === 'timer' && <TimerView key={route} route={route} />}
         {base === 'routine' && <RoutineView key={route} route={route} />}

@@ -3,6 +3,7 @@ import { addDays, buildTimeline, DAYS, isCustom, planFor, reviewWeek, sessionDat
 import { fmtDate, MONTHS, painWords, STRENGTH, STRENGTH_LIST, todayISO } from '../guide'
 import { Gauge, Note } from '../ui'
 import { paceOf, timeOf } from '../fit'
+import { hrMaxOf, zoneHint, zonesFrom } from '../../shared/analysis'
 import { cooldownFor, parseIntervals, routineById, totalOf, warmupFor, type Routine } from '../../shared/training'
 
 export const phaseName = (plan: Plan, p: number) => plan.meta.phases[String(p)] ?? 'Piano'
@@ -10,7 +11,9 @@ export const weekLabel = (s: Slot) => s.maintenance ? 'Mantenimento' : `Settiman
 
 const mins = (r: Routine) => `${Math.round(totalOf(r.steps) / 60)} min`
 function SessionHero({ s, date, done, label }: { s: Slot; date: string; done?: Activity; label: string }) {
+  const max = hrMaxOf(data.value!)
   const ses = s.sessions.find(x => sessionDate(s, x.day) === date)!
+  const hint = zoneHint(`${ses.text} ${ses.fiato ?? ''}`, max ? zonesFrom(max) : null)
   const iv = parseIntervals(ses.text), warm = warmupFor(ses.text), cool = cooldownFor(ses.text, ses.km), run = ses.km !== 0
   return (
     <section class="hero">
@@ -18,6 +21,7 @@ function SessionHero({ s, date, done, label }: { s: Slot; date: string; done?: A
       <h1>{ses.text}</h1>
       {ses.km ? <p class="bigkm"><b>{Math.round(ses.km * 10) / 10}</b> km</p> : null}
       <Gauge fiato={ses.fiato} fatica={ses.fatica} />
+      {hint && <p class="zonehint">{hint}</p>}
       {done
         ? <div class="done"><strong>Registrato</strong><span>{[done.km ? done.km + ' km' : null, timeOf(done.seconds), paceOf(done.km, done.seconds), done.fatica ? `fatica ${done.fatica}` : null].filter(Boolean).join(', ')}</span><a href={`#/registra?id=${done.id}`}>Modifica</a></div>
         : <>
@@ -25,6 +29,7 @@ function SessionHero({ s, date, done, label }: { s: Slot; date: string; done?: A
           {iv && <a class="btn ghost" href={`#/timer?key=${sessionKey(s, ses.day)}&date=${date}&text=${encodeURIComponent(ses.text)}`}>Avvia il timer</a>}
           <a class="btn" href={`#/registra?key=${sessionKey(s, ses.day)}&date=${date}`}>Registra allenamento</a>
         </>}
+      {done?.trace?.length ? <a class="btn ghost" href={`#/corsa?id=${done.id}`}>Dettaglio corsa</a> : null}
       {done && <a class="btn ghost" href={`#/routine?id=${cool.id}`}>{cool.name}, {mins(cool)}</a>}
     </section>
   )

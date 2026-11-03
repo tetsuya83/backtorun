@@ -48,3 +48,7 @@ La libreria FIT di Garmin ha una propria licenza: `node_modules/@garmin/fitsdk/L
 ## Forza, timer e routine
 
 La logica sta in `shared/training.ts`, senza chiamate esterne. La scheda di forza (`#/forza`) traduce in numeri gli schemi del piano, salva le serie dentro l'attività (`sets`) e tiene la seduta aperta sul telefono finché non viene salvata. Il timer (`#/timer`) e le routine (`#/routine`) calcolano tutto dall'orologio e programmano in anticipo i suoni.
+
+## Analisi delle corse
+
+`shared/analysis.ts` calcola zone, tempo in zona, deriva cardiaca, carico settimanale e confronto della cadenza. La FC massima sta nello stato di ogni persona e le percentuali delle zone sono quelle della tabella Excel. Il dettaglio della corsa è in `#/corsa`.

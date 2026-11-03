@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import plan from '../shared/plan.json'
 import { buildTimeline, defaultState, moveRace, planError, planFor, reviewWeek, scalaResult, sessionDate, slotForDate, sessionKey, strengthDays, type Day, type Plan, type Activity, type ScalaRound } from '../shared/engine'
 import { cooldownFor, intervalSteps, jointOk, parseIntervals, ROUTINES, schemeFor, stepAt, suggest, totalOf, warmupFor, WORKOUTS, type ExerciseLog } from '../shared/training'
+import { drift, hrMaxOf, isSteady, kmSplits, loadAlert, loadOf, observedMax, samePace, timeInZones, weeklyLoads, zoneHint, zoneOf, zonesFrom } from '../shared/analysis'
+import { data, startCustomPlan, switchPlan } from '../src/api'
 import { blankPlan, generatePlan, type GoalInput, type RaceType } from '../shared/generator'
 const P = plan as unknown as Plan
 describe('calendario', () => {
@@ -182,5 +184,69 @@ describe('timer', () => {
     expect(warmupFor('Facile 6 km + 4 allunghi').id).toBe('warm-work'); expect(warmupFor('Ripetute: 5×[1 km Z4 + 2\' facile] (9 km)').id).toBe('warm-work')
     expect(cooldownFor('Facile 6 km', 6).id).toBe('cool-run'); expect(cooldownFor('Lungo 18 km', 18).id).toBe('cool-long')
     for (const r of ROUTINES) { const m = totalOf(r.steps) / 60; expect(m).toBeGreaterThan(2); expect(m).toBeLessThan(16) }
+  })
+})
+
+describe('zone', () => {
+  const z = zonesFrom(186)
+  it('riproducono la tabella Excel senza buchi', () => {
+    expect(z.map(x => x.hi)).toEqual([130, 150, 159, 169, 186]); expect(z[0].lo).toBe(93)
+    for (let i = 1; i < 5; i++) expect(z[i].lo).toBe(z[i - 1].hi + 1)
+    expect(zoneOf(z, 150)!.id).toBe(2); expect(zoneOf(z, 151)!.id).toBe(3); expect(zoneOf(z, 80)).toBeNull(); expect(zoneOf(z, 200)!.id).toBe(5)
+  })
+  it('la FC massima vale per persona e Roberto parte dalla sua tabella', () => {
+    expect(hrMaxOf({ state: {}, me: { isAdmin: true } })).toBe(186); expect(hrMaxOf({ state: {}, me: { isAdmin: false } })).toBeNull()
+    expect(hrMaxOf({ state: { hrMax: 178 }, me: { isAdmin: true } })).toBe(178)
+    expect(observedMax([{ id: 'a', date: '', type: 'corsa', source: 'fit', hrMax: 177 }, { id: 'b', date: '', type: 'corsa', source: 'fit', hrMax: 255 }])).toBe(177)
+  })
+  it('traduce le zone citate dalla seduta', () => {
+    expect(zoneHint('Interval: 5×[3\' Z4 + 2\' facile]', z)).toBe('Z4: 160-169 bpm'); expect(zoneHint('Fartlek Z3-Z4', z)).toBe('Z3-Z4: 151-169 bpm')
+    expect(zoneHint('Facile 5 km', z)).toBeNull(); expect(zoneHint('Z2', null)).toBeNull()
+  })
+})
+describe('analisi corsa', () => {
+  const run = (min: number, hr: (t: number) => number) => Array.from({ length: 241 }, (_, i) => { const t = i * min * 60 / 240; return [t, hr(t), Math.round(t * 2.5)] as [number, number, number] })
+  it('misura il tempo in zona e ignora le pause', () => {
+    const z = zonesFrom(186), v = timeInZones([[0, 140, 0], [30, 140, 75], [60, 165, 150], [400, 165, 200]], z)
+    expect(v[1]).toBe(30); expect(v[3]).toBe(30); expect(v.reduce((a, b) => a + b)).toBe(60)
+  })
+  it('calcola gli intertempi al km', () => {
+    const k = kmSplits(run(10, () => 150)); expect(k.length).toBe(2); expect(k[0].seconds).toBe(400); expect(k[1].partial).toBe(true); expect(k[0].hr).toBe(150)
+  })
+  it('riconosce la deriva solo su corse regolari e abbastanza lunghe', () => {
+    expect(drift(run(60, () => 140))).toMatchObject({ value: 0, level: 'bassa' })
+    const d = drift(run(60, t => 130 + t / 3600 * 30)); expect(d!.value).toBeGreaterThan(5); expect(d!.value).toBeLessThan(15)
+    expect(drift(run(30, () => 140))).toBeNull(); expect(drift(run(60, () => 140), 'Ripetute: 5×[1 km Z4 + 2\' facile] (9 km)')).toBeNull()
+    expect(drift(run(60, () => 140), 'Lungo 18 km')).not.toBeNull(); expect(drift(run(60, () => 140), 'Lungo 26 km, ultimi 6 a ritmo gara')).toBeNull()
+    expect(drift(null)).toBeNull(); expect(isSteady('Facile 6 km + 4 allunghi')).toBe(false); expect(isSteady('Facile 6 km')).toBe(true)
+  })
+})
+describe('carico', () => {
+  const a = (date: string, min: number, f?: number): Activity => ({ id: date, date, type: 'corsa', source: 'manuale', seconds: min * 60, fatica: f })
+  it('è durata per fatica e segnala ciò che manca', () => {
+    expect(loadOf(a('2026-11-03', 40, 5))).toBe(200); expect(loadOf(a('2026-11-03', 40))).toBeNull()
+    const w = weeklyLoads([a('2026-11-02', 40, 5), a('2026-11-08', 20, 5), a('2026-11-09', 10, 5), a('2026-11-04', 10)], '2026-11-08', 2)
+    expect(w[1]).toMatchObject({ monday: '2026-11-02', load: 300, missing: 1 }); expect(w[0].load).toBe(0)
+  })
+  const w = (l: number[]) => l.map((load, i) => ({ monday: String(i), load, missing: 0 }))
+  it('avvisa solo con storico e aumento netto', () => {
+    expect(loadAlert(w([500, 500, 500, 500, 800]))).toMatchObject({ pct: 60, avg: 500 })
+    expect(loadAlert(w([500, 500, 500, 500, 640]))).toBeNull()
+    expect(loadAlert(w([0, 0, 100, 100, 900]))).toBeNull()
+    expect(loadAlert(w([50, 50, 50, 50, 120]))).toBeNull()
+  })
+  it('confronta la cadenza a ritmo simile', () => {
+    const r = (k: number, s: number, c?: number): Activity => ({ id: `${s}`, date: '', type: 'corsa', source: 'fit', km: k, seconds: s, cadence: c })
+    expect(samePace([r(1, 400, 160), r(1, 410, 162), r(1, 300, 175), r(1, 405)]).map(x => x.cadence)).toEqual([160, 162])
+  })
+})
+
+describe('FC massima e cambio piano', () => {
+  it('resta quando si cambia o si crea un piano', () => {
+    const custom = blankPlan('x', 'Mia', 2)
+    data.value = { plan: P, custom, state: { ...defaultState, mode: 'base', hrMax: 178 }, activities: [], tests: [] }
+    switchPlan('custom'); expect(data.value!.state).toMatchObject({ mode: 'custom', hrMax: 178 })
+    switchPlan('base'); expect(data.value!.state).toMatchObject({ mode: 'base', hrMax: 178 })
+    startCustomPlan(custom, { startDate: '2026-11-09', raceDate: null, raceName: null }); expect(data.value!.state.hrMax).toBe(178)
   })
 })

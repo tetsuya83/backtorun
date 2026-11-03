@@ -1,10 +1,11 @@
+import { hrMaxOf, observedMax, validHr, zonesFrom } from '../../shared/analysis'
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { call, clearLocal, data, load, saveCustomPlan, saveState } from '../api'
 import { Field, Note } from '../ui'
 import { isCustom, moveRace, planFor, type Activity } from '../../shared/engine'
 
 const save = (name: string, text: string, type: string) => { const u = URL.createObjectURL(new Blob([text], { type })); const a = document.createElement('a'); a.href = u; a.download = name; a.click(); URL.revokeObjectURL(u) }
-const CSV = ['date', 'type', 'source', 'km', 'seconds', 'hrAvg', 'hrMax', 'hrLast', 'splits', 'fiato', 'fatica', 'knee', 'swelling', 'locked', 'note', 'sessionKey'] as const
+const CSV = ['date', 'type', 'source', 'km', 'seconds', 'hrAvg', 'hrMax', 'hrLast', 'splits', 'fiato', 'fatica', 'knee', 'swelling', 'locked', 'note', 'sessionKey', 'cadence', 'ascent'] as const
 const scheda = (a: Activity) => (a.sets ?? []).map(x => `${x.name}: ${x.sets.map(s => (s.kg ? `${s.kg}kg×` : '') + s.reps).join(' ')}`).join(' | ')
 const csv = (l: Activity[]) => [[...CSV, 'scheda'].join(';'), ...l.map(a => [...CSV.map(k => a[k]), scheda(a) || null].map(v => v == null ? '' : `"${String(v).replace(/"/g, '""')}"`).join(';'))].join('\n')
 interface Person { id: number; name: string; isAdmin: number; activities: number }
@@ -40,6 +41,19 @@ function People() {
     {err && <p class="err" role="alert">{err}</p>}
   </>
 }
+function Heart() {
+  const d = data.value!, st = d.state, max = hrMaxOf(d), seen = observedMax(d.activities)
+  const [v, setV] = useState(max ? String(max) : ''), n = +v
+  const put = (x: number | null) => { saveState({ ...st, hrMax: x }); setV(x ? String(x) : '') }
+  return <>
+    <h2 class="phase">Frequenza cardiaca</h2>
+    <Field label="FC massima"><input inputMode="numeric" value={v} placeholder="Per esempio 180" onInput={e => setV(e.currentTarget.value)} onChange={() => { if (validHr(n)) put(n); else if (!v) put(null) }} /></Field>
+    {!!v && !validHr(n) && <p class="err">Scrivi un valore tra 120 e 230.</p>}
+    {seen != null && (!max || seen > max) && <button type="button" class="btn ghost" onClick={() => put(seen)}>Usa la più alta registrata: {seen}</button>}
+    {max ? <table class="splits"><tbody>{zonesFrom(max).map(z => <tr key={z.id}><td>{z.name}</td><td>{z.lo}-{z.hi} bpm</td></tr>)}</tbody></table> : null}
+    <p class="sub pad">Il valore più affidabile viene da un test massimale o da una gara corta. Le formule per età possono sbagliare di parecchio.</p>
+  </>
+}
 export function Settings({ onLogout }: { onLogout: () => void }) {
   const d = data.value!, st = d.state, custom = isCustom(planFor(d))
   const [msg, setMsg] = useState('')
@@ -58,6 +72,7 @@ export function Settings({ onLogout }: { onLogout: () => void }) {
       <h2 class="phase">Calendario</h2>
       <Field label="Inizio del piano"><input type="date" value={st.startDate} onChange={e => saveState({ ...st, startDate: e.currentTarget.value })} /></Field>
       {!custom && <Field label="Settimana di partenza"><input type="number" min={1} max={34} value={st.startWeek} onChange={e => saveState({ ...st, startWeek: Math.min(34, Math.max(1, +e.currentTarget.value || 1)) })} /></Field>}
+      <Heart />
       <h2 class="phase">Gara</h2>
       <Field label={custom ? 'Data della gara' : 'Data della maratona'}><input type="date" value={st.raceDate ?? ''} onChange={e => {
         const v = e.currentTarget.value || null

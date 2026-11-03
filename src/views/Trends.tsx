@@ -1,7 +1,8 @@
 import { useState } from 'preact/hooks'
 import { data } from '../api'
 import { topKg } from '../../shared/training'
-import { Field } from '../ui'
+import { hrMaxOf, loadAlert, samePace, weeklyLoads, zonesFrom } from '../../shared/analysis'
+import { Field, Note } from '../ui'
 import { addDays, buildTimeline, isCustom, planFor, sessionKey, upper, type Slot } from '../../shared/engine'
 import { fmtDate, painWords, todayISO } from '../guide'
 import { paceOf } from '../fit'
@@ -19,7 +20,7 @@ function Bars({ rows, title, unit }: { rows: { label: string; done: number; plan
       </g>)}
     </svg></figure>
 }
-function Line({ pts, title, max, min = 0, unit, ref2 }: { pts: { label: string; v: number; t?: number | null }[]; title: string; max: number; min?: number; unit: string; ref2?: number }) {
+export function Line({ pts, title, max, min = 0, unit, ref2, dots = true }: { pts: { label: string; v: number; t?: number | null }[]; title: string; max: number; min?: number; unit: string; ref2?: number; dots?: boolean }) {
   const h = 130, y0 = 12, x = (i: number) => 14 + (W - 28) * (pts.length > 1 ? i / (pts.length - 1) : .5), y = (v: number) => y0 + (h - y0) * (1 - (v - min) / (max - min))
   const path = (k: 'v' | 't') => pts.map((p, i) => p[k] == null ? '' : `${x(i)},${y(p[k]!)}`).join(' ')
   return <figure class="chart"><figcaption>{title}</figcaption>
@@ -27,7 +28,7 @@ function Line({ pts, title, max, min = 0, unit, ref2 }: { pts: { label: string; 
       {ref2 != null && <><line x1="0" x2={W} y1={y(ref2)} y2={y(ref2)} class="ref" /><text x={W - 2} y={y(ref2) - 4} text-anchor="end" class="tick">limite {ref2}</text></>}
       {pts.some(p => p.t != null) && <polyline points={path('t')} class="target" />}
       <polyline points={path('v')} class="val" />
-      {pts.map((p, i) => <circle key={i} cx={x(i)} cy={y(p.v)} r="3.5" class="dot"><title>{`${p.label}: ${p.v}${unit}`}</title></circle>)}
+      {dots && pts.map((p, i) => <circle key={i} cx={x(i)} cy={y(p.v)} r="3.5" class="dot"><title>{`${p.label}: ${p.v}${unit}`}</title></circle>)}
       <text x="2" y={h + 15} class="tick">{pts[0]?.label}</text><text x={W - 2} y={h + 15} text-anchor="end" class="tick">{pts.at(-1)?.label}</text>
     </svg></figure>
 }
@@ -55,8 +56,12 @@ export function Trends() {
   const last = runs.slice(-16)
   const fat = last.filter(a => a.fatica != null).map(a => ({ label: fmtDate(a.date, { day: 'numeric', month: 'short' }), v: a.fatica!, t: a.sessionKey ? upper(ses.get(a.sessionKey)?.fatica) : null }))
   const knee = last.filter(a => a.knee != null).map(a => ({ label: fmtDate(a.date, { day: 'numeric', month: 'short' }), v: a.knee! }))
+  const hrm = hrMaxOf(d), z2 = hrm ? zonesFrom(hrm)[1] : null
+  const loads = weeklyLoads(d.activities, today, 8), alert = loadAlert(loads), shown = loads.slice(Math.max(0, loads.findIndex(w => w.load > 0))), noLoad = loads.reduce((s, w) => s + w.missing, 0)
+  const cad = samePace(runs).slice(-16).map(a => ({ label: fmtDate(a.date, { day: 'numeric', month: 'short' }), v: a.cadence! }))
+  const fits = runs.filter(a => a.trace?.length).slice(-6).reverse()
   // efficienza: secondi al km alla stessa FC di Z2, più basso è meglio
-  const eff = runs.filter(a => a.km && a.seconds && a.hrAvg && a.hrAvg >= 125 && a.hrAvg <= 152).slice(-16).map(a => ({ label: fmtDate(a.date, { day: 'numeric', month: 'short' }), v: Math.round(a.seconds! / a.km! ) }))
+  const eff = runs.filter(a => z2 && a.km && a.seconds && a.hrAvg && a.hrAvg >= z2.lo && a.hrAvg <= z2.hi).slice(-16).map(a => ({ label: fmtDate(a.date, { day: 'numeric', month: 'short' }), v: Math.round(a.seconds! / a.km! ) }))
   const best = eff.length ? eff.reduce((m, x) => x.v < m ? x.v : m, 9999) : 0
   return (
     <div class="stack">
@@ -64,10 +69,15 @@ export function Trends() {
         <div class="stats"><div><b>{Math.round(totKm)}</b><span>km corsi</span></div><div><b>{runs.length}</b><span>corse</span></div><div><b>{extra}</b><span>sedute extra</span></div></div>
       </section>
       <Bars rows={rows} title="Chilometri a settimana, fatti su previsti" unit="km" />
+      {alert && <Note><strong>Carico in salita.</strong> Questa settimana sei a {alert.load}, il {alert.pct}% sopra la media recente di {alert.avg}. Se non lo hai scelto tu, tieni facili le prossime sedute.</Note>}
+      {loads.some(w => w.load > 0) && <><Bars rows={shown.map(w => ({ label: fmtDate(w.monday, { day: 'numeric', month: 'numeric' }), done: w.load, plan: null }))} title="Carico settimanale" unit="punti" /><p class="sub pad">Minuti per fatica di tutti gli allenamenti.{noLoad ? ` ${noLoad} senza durata o fatica non sono conteggiati.` : ''}</p></>}
       {fat.length > 1 && <Line pts={fat} max={10} title="Fatica reale e attesa" unit="/10" />}
       {knee.length > 1 && <Line pts={knee} max={10} title={painWords(isCustom(plan)).chart} unit="/10" ref2={2} />}
       <Loads />
+      {!z2 && <p class="sub pad"><a href="#/impostazioni">Imposta la FC massima</a> per vedere il ritmo in Z2.</p>}
+      {cad.length > 1 && <Line pts={cad} min={Math.min(...cad.map(c => c.v)) - 6} max={Math.max(...cad.map(c => c.v)) + 6} title="Cadenza a ritmo simile" unit=" passi/min" />}
       {eff.length > 1 && <><Line pts={eff.map(e => ({ ...e }))} min={best - 30} max={Math.max(...eff.map(e => e.v)) + 15} title="Ritmo in Z2, più basso è meglio" unit=" s/km" /><p class="sub pad">Miglior ritmo con FC media in Z2: {paceOf(1, best)}.</p></>}
+      {fits.length > 0 && <section><h2 class="phase">Ultime corse</h2><ul class="hist">{fits.map(a => <li key={a.id}><a href={`#/corsa?id=${a.id}`}><b>{fmtDate(a.date, { day: 'numeric', month: 'short' })}</b><span>{a.km} km, {paceOf(a.km, a.seconds)}</span></a></li>)}</ul></section>}
     </div>
   )
 }

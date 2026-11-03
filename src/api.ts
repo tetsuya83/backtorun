@@ -61,7 +61,7 @@ const nextMonday = () => { const d = new Date(); d.setDate(d.getDate() + ((8 - d
 export function switchPlan(mode: 'base' | 'custom') {
   const st = data.value!.state
   if ((st.mode ?? 'base') === mode) { if (!st.mode) saveState({ ...st, mode }); return }
-  saveState({ ...defaultState, startDate: nextMonday(), ...st.other, mode, other: core(st) })
+  saveState({ ...defaultState, startDate: nextMonday(), ...st.other, hrMax: st.hrMax, mode, other: core(st) })
 }
 export function saveCustomPlan(p: Plan) {
   const plan = normalizePlan(p)
@@ -72,7 +72,7 @@ export function saveCustomPlan(p: Plan) {
 /** Attiva un piano appena creato e ne fissa il calendario. */
 export function startCustomPlan(p: Plan, s: Pick<State, 'startDate' | 'raceDate' | 'raceName'>) {
   const st = data.value!.state, plan = saveCustomPlan(p)
-  saveState({ ...s, startWeek: 1, skips: [], repeats: [], mode: 'custom', other: st.mode === 'custom' ? st.other : core(st) })
+  saveState({ ...s, startWeek: 1, skips: [], repeats: [], hrMax: st.hrMax, mode: 'custom', other: st.mode === 'custom' ? st.other : core(st) })
   return plan
 }
 export function saveTest(t: TestRec) {

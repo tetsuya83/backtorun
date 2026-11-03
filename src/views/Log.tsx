@@ -67,6 +67,7 @@ export function Log({ route }: { route: string }) {
         <button type="button" class="btn ghost" onClick={() => file.current?.click()}>Carica file FIT</button></section>}
       {msg && <Note tone="go">{msg}</Note>}
       {a.type === 'forza' && !existing && <a class="btn ghost" href={`#/forza?date=${a.date}`}>Usa la scheda guidata</a>}
+      {existing?.trace?.length ? <a class="btn ghost" href={`#/corsa?id=${existing.id}`}>Dettaglio corsa</a> : null}
       {!!a.sets?.length && <section class="panel"><h2>Scheda</h2><ul class="sets-sum">{a.sets.map(x => <li key={x.id}><b>{x.name}</b> {x.sets.map(s => (s.kg ? `${s.kg} kg × ` : '') + s.reps).join(', ')}</li>)}</ul></section>}
       <div class="seg" role="group" aria-label="Tipo di attività">{TYPES.map(([id, l]) => <button type="button" key={id} class={a.type === id ? 'sel' : ''} aria-pressed={a.type === id} onClick={() => up({ type: id })}>{l}</button>)}</div>
       <Field label="Data"><input type="date" value={a.date} onInput={e => up({ date: e.currentTarget.value, sessionKey: null })} required /></Field>

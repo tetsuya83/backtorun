@@ -5,12 +5,12 @@ export interface Session { day: Day; text: string; km: number | null; fiato?: st
 export interface Week { week: number | string; phase: number; scarico: boolean; skippable: boolean; total: number | null; sessions: Session[]; uid?: string }
 export interface PlanMeta { phases: Record<string, string>; kind?: 'custom'; id?: string; name?: string; strengthDays?: Day[] }
 export interface Plan { meta: PlanMeta; weeks: Week[]; maintenance: Week[] }
-export interface State { startDate: string; startWeek: number; skips: number[]; repeats: number[]; raceDate: string | null; raceName?: string | null; mode?: 'base' | 'custom'; other?: Partial<State> | null }
+export interface State { startDate: string; startWeek: number; skips: number[]; repeats: number[]; raceDate: string | null; raceName?: string | null; mode?: 'base' | 'custom'; hrMax?: number | null; other?: Partial<State> | null }
 export interface Activity {
   id: string; date: string; type: 'corsa' | 'forza' | 'nuoto' | 'bici' | 'altro'; sessionKey?: string | null; source: 'manuale' | 'fit'
   km?: number | null; seconds?: number | null; hrAvg?: number | null; hrMax?: number | null; hrLast?: number | null
   splits?: string | null; fiato?: number | null; fatica?: number | null; knee?: number | null; swelling?: boolean | null; locked?: boolean | null
-  note?: string | null; trace?: [number, number | null, number | null][] | null; sets?: ExerciseLog[] | null; updatedAt?: number
+  note?: string | null; trace?: [number, number | null, number | null, (number | null)?, (number | null)?][] | null; cadence?: number | null; ascent?: number | null; sets?: ExerciseLog[] | null; updatedAt?: number
 }
 export interface Slot extends Week { monday: string; key: string; maintenance?: boolean; occurrence: number }
 

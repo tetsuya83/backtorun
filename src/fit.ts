@@ -28,14 +28,22 @@ export function parseFit(buf: ArrayBuffer): FitResult {
   const lastKm = rec.filter(r => r.distance >= dist - 1000 && r.heartRate > 0).map(r => r.heartRate)
   const step = Math.max(1, Math.ceil(rec.length / 240))
   const t00 = rec[0]?.timestamp?.getTime?.() ?? 0
-  const trace = rec.filter((_, i) => i % step === 0).map(r => [Math.round((r.timestamp.getTime() - t00) / 1000), r.heartRate ?? null, r.distance != null ? Math.round(r.distance) : null] as [number, number | null, number | null])
   const sport = String(sess?.sport ?? 'running')
+  // nel FIT la corsa conta i passi di un solo piede: si raddoppia per avere i passi al minuto
+  const cads = rec.map(r => r.cadence == null ? 0 : r.cadence + (r.fractionalCadence ?? 0)).filter(x => x > 30).sort((a, b) => a - b)
+  const twice = (sport === 'running' || sport === 'walking') && (cads[cads.length >> 1] ?? sess?.avgRunningCadence ?? sess?.avgCadence ?? 0) < 130 ? 2 : 1
+  const cadence = (cads.length ? avg(cads) : sess?.avgRunningCadence ?? sess?.avgCadence) ?? null
+  const altOf = (r: any): number | null => r.enhancedAltitude ?? r.altitude ?? null
+  let gain = 0, ref: number | null = null // la soglia di 3 m evita di sommare il rumore della quota
+  for (const r of rec) { const q = altOf(r); if (q == null) continue; if (ref == null || q < ref) ref = q; else if (q - ref >= 3) { gain += q - ref; ref = q } }
+  const trace = rec.filter((_, i) => i % step === 0).map(r => { const q = altOf(r); return [Math.round((r.timestamp.getTime() - t00) / 1000), r.heartRate ?? null, r.distance != null ? Math.round(r.distance) : null, q != null ? Math.round(q) : null, r.cadence ? Math.round((r.cadence + (r.fractionalCadence ?? 0)) * twice) : null] as [number, number | null, number | null, number | null, number | null] })
   return {
     date, sport, laps: laps.length, source: 'fit',
     type: sport === 'cycling' ? 'bici' : sport === 'swimming' ? 'nuoto' : sport === 'running' || sport === 'walking' ? 'corsa' : 'altro',
     km: Math.round(dist / 10) / 100, seconds: Math.round(secs),
     hrAvg: sess?.avgHeartRate ?? avg(hrs), hrMax: sess?.maxHeartRate ?? (hrs.length ? Math.max(...hrs) : null), hrLast: avg(lastKm),
     splits: splits.join(' - ') || null, trace,
+    cadence: cadence ? Math.round(cadence * twice) : null, ascent: sess?.totalAscent != null ? Math.round(sess.totalAscent) : ref != null ? Math.round(gain) : null,
   }
 }
 export const paceOf = (km?: number | null, s?: number | null) => km && s ? fmt(s / km) + '/km' : null
