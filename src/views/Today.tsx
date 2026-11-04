@@ -1,10 +1,13 @@
-import { data, saveActivity, saveState } from '../api'
-import { addDays, buildTimeline, DAYS, isCustom, planFor, reviewWeek, sessionDate, sessionKey, slotForDate, strengthDays, type Activity, type Plan, type Slot } from '../../shared/engine'
-import { fmtDate, MONTHS, painWords, STRENGTH, STRENGTH_LIST, todayISO } from '../guide'
-import { Gauge, Note } from '../ui'
+import { data, saveState } from '../api'
+import { buildTimeline, DAYS, isCustom, planFor, reviewWeek, sessionDate, sessionKey, slotForDate, strengthDays, type Activity, type Plan, type Slot } from '../../shared/engine'
+import { fmtDate, MONTHS, STRENGTH, STRENGTH_LIST, todayISO } from '../guide'
+import { BlockList, Gauge, Note } from '../ui'
+import { blocksOf } from '../../shared/blocks'
+import { learnFor } from '../learn'
+import { BodyAlerts } from './Home'
 import { paceOf, timeOf } from '../fit'
 import { hrMaxOf, zoneHint, zonesFrom } from '../../shared/analysis'
-import { cooldownFor, parseIntervals, routineById, totalOf, warmupFor, type Routine } from '../../shared/training'
+import { cooldownFor, routineById, totalOf, warmupFor, type Routine } from '../../shared/training'
 
 export const phaseName = (plan: Plan, p: number) => plan.meta.phases[String(p)] ?? 'Piano'
 export const weekLabel = (s: Slot) => s.maintenance ? 'Mantenimento' : `Settimana ${s.week}`
@@ -14,40 +17,36 @@ function SessionHero({ s, date, done, label }: { s: Slot; date: string; done?: A
   const max = hrMaxOf(data.value!)
   const ses = s.sessions.find(x => sessionDate(s, x.day) === date)!
   const hint = zoneHint(`${ses.text} ${ses.fiato ?? ''}`, max ? zonesFrom(max) : null)
-  const iv = parseIntervals(ses.text), warm = warmupFor(ses.text), cool = cooldownFor(ses.text, ses.km), run = ses.km !== 0
+  const blocks = blocksOf(ses), art = learnFor(ses.text), warm = warmupFor(ses.text), cool = cooldownFor(ses.text, ses.km), run = ses.km !== 0
   return (
     <section class="hero">
       <p class="eyebrow">{label}</p>
       <h1>{ses.text}</h1>
       {ses.km ? <p class="bigkm"><b>{Math.round(ses.km * 10) / 10}</b> km</p> : null}
+      {blocks && blocks.length > 1 && run && <BlockList blocks={blocks} />}
       <Gauge fiato={ses.fiato} fatica={ses.fatica} />
       {hint && <p class="zonehint">{hint}</p>}
       {done
         ? <div class="done"><strong>Registrato</strong><span>{[done.km ? done.km + ' km' : null, timeOf(done.seconds), paceOf(done.km, done.seconds), done.fatica ? `fatica ${done.fatica}` : null].filter(Boolean).join(', ')}</span><a href={`#/registra?id=${done.id}`}>Modifica</a></div>
         : <>
           {run && <a class="btn ghost" href={`#/routine?id=${warm.id}`}>{warm.name}, {mins(warm)}</a>}
-          {iv && <a class="btn ghost" href={`#/timer?key=${sessionKey(s, ses.day)}&date=${date}&text=${encodeURIComponent(ses.text)}`}>Avvia il timer</a>}
-          <a class="btn" href={`#/registra?key=${sessionKey(s, ses.day)}&date=${date}`}>Registra allenamento</a>
+          {blocks && run && <a class="btn" href={`#/guida?key=${sessionKey(s, ses.day)}&date=${date}`}>Avvia allenamento guidato</a>}
+          <a class={'btn' + (blocks && run ? ' ghost' : '')} href={`#/registra?key=${sessionKey(s, ses.day)}&date=${date}`}>Registra allenamento</a>
         </>}
       {done?.trace?.length ? <a class="btn ghost" href={`#/corsa?id=${done.id}`}>Dettaglio corsa</a> : null}
       {done && <a class="btn ghost" href={`#/routine?id=${cool.id}`}>{cool.name}, {mins(cool)}</a>}
+      {art && <a href={`#/impara/${art.id}`}>Cos'è e a cosa serve: {art.title.toLowerCase()}</a>}
     </section>
   )
 }
 
 export function Today() {
-  const d = data.value!, plan = planFor(d), custom = isCustom(plan), words = painWords(custom), t = buildTimeline(plan, d.state), today = todayISO()
+  const d = data.value!, plan = planFor(d), custom = isCustom(plan), t = buildTimeline(plan, d.state), today = todayISO()
   const first = t.slots[0], slot = slotForDate(t, today)
   const started = today >= first.monday
   const [mn, temp, tip] = MONTHS[+today.slice(5, 7) - 1]
   const ses = slot?.sessions.find(x => sessionDate(slot, x.day) === today)
   const done = slot && ses ? d.activities.find(a => a.sessionKey === sessionKey(slot, ses.day)) : undefined
-  // ginocchio del mattino dopo
-  const yest = addDays(today, -1)
-  const check = d.activities.find(a => a.type === 'corsa' && a.date === yest && a.swelling == null)
-  const lastKnee = [...d.activities].reverse().find(a => a.type === 'corsa')
-  const stop = lastKnee && (lastKnee.locked)
-  const swollen = lastKnee && !lastKnee.locked && (lastKnee.swelling || (lastKnee.knee ?? 0) > 2)
   // revisione settimana precedente
   const idx = slot ? t.slots.indexOf(slot) : -1
   const prev = idx > 0 ? t.slots[idx - 1] : undefined
@@ -64,16 +63,7 @@ export function Today() {
         <h1>Si parte il {fmtDate(first.monday, { day: 'numeric', month: 'long' })}, dalla settimana {first.week}</h1>
         {custom ? <a class="btn" href="#/piano">Guarda il piano</a> : <a class="btn" href="#/test">Fai il test della Scala</a>}
       </section>}
-      {stop && <Note tone="stop"><strong>{words.stop}</strong> {words.stopText}</Note>}
-      {swollen && <Note tone="stop"><strong>{words.warn}</strong> {words.warnText}</Note>}
-      {check && <section class="panel">
-        <h2>{words.askTitle}</h2>
-        <p>{words.ask}</p>
-        <div class="row">
-          <button class="btn ghost" onClick={() => saveActivity({ ...check, swelling: false })}>No</button>
-          <button class="btn ghost danger" onClick={() => saveActivity({ ...check, swelling: true })}>{words.yes}</button>
-        </div>
-      </section>}
+      <BodyAlerts />
       {started && slot && ses && <SessionHero s={slot} date={today} done={done} label={`${weekLabel(slot)}, ${phaseName(plan, slot.phase)}${slot.scarico ? ', scarico' : ''}`} />}
       {started && slot && !ses && <section class="hero rest">
         <p class="eyebrow">{weekLabel(slot)}, {phaseName(plan, slot.phase)}</p>
@@ -100,7 +90,13 @@ export function Today() {
         <h2>Prossima corsa: {fmtDate(nextDate, { weekday: 'long', day: 'numeric' })}</h2>
         <p>{nextSlot.sessions.find(x => sessionDate(nextSlot, x.day) === nextDate)?.text}</p>
       </section>}
-      <a class="btn ghost" href="#/routine">Routine e timer libero</a>
+      <h2 class="phase">Altro</h2>
+      <ul class="cards">
+        <li><a href="#/costruisci"><span><b>Costruisci un allenamento</b><small>Scegli un modello, adatta i blocchi e parti</small></span></a></li>
+        <li><a href={`#/forza?date=${today}`}><span><b>Forza</b><small>Scheda guidata, in palestra o a casa</small></span></a></li>
+        <li><a href="#/routine"><span><b>Routine e timer libero</b><small>Riscaldamento, mobilità, defaticamento</small></span></a></li>
+        <li><a href="#/registra"><span><b>Registra un allenamento</b><small>A mano o da file FIT, GPX, TCX</small></span></a></li>
+      </ul>
       <section class="panel quiet">
         <h2>{mn} in zona Milano: {temp}</h2>
         <p>{tip} Valori medi di Milano.</p>

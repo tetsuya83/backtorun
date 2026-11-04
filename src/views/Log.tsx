@@ -3,7 +3,11 @@ import { data, deleteActivity, saveActivity, uid } from '../api'
 import { buildTimeline, isCustom, planFor, sessionDate, sessionKey, type Activity } from '../../shared/engine'
 import { fmtDate, painWords, todayISO, WEEKDAY } from '../guide'
 import { breathHint, Field, Gauge, nav, Note, Scale } from '../ui'
-import { paceOf, parseFit, timeOf, type FitResult } from '../fit'
+import { paceOf, parseActivityFile, timeOf, type FitResult } from '../fit'
+import { painsOf, withPains, type Pain } from '../../shared/pain'
+import { PainPicker } from './Pain'
+import { RESULT, type GuideResult } from './Guide'
+import { local } from '../sound'
 
 const TYPES = [['corsa', 'Corsa'], ['forza', 'Forza'], ['nuoto', 'Nuoto'], ['bici', 'Bici'], ['altro', 'Altro']] as const
 const toSec = (s: string) => { const m = s.trim().match(/^(?:(\d+):)?(\d+)(?::(\d{1,2}))?$/); if (!m) return null; if (m[3] != null) return +(m[1] ?? 0) * 3600 + +m[2] * 60 + +m[3]; if (m[1] != null) return +m[1] * 60 + +m[2]; return +m[2] * 60 }
@@ -12,12 +16,18 @@ const num = (v: string) => v === '' ? null : +v.replace(',', '.')
 
 export function Log({ route }: { route: string }) {
   const d = data.value!, q = new URLSearchParams(route.split('?')[1] ?? '')
-  const plan = planFor(d), words = painWords(isCustom(plan))
+  const plan = planFor(d), custom = isCustom(plan), words = painWords(custom)
   const t = useMemo(() => buildTimeline(plan, d.state), [plan, d.state])
   const existing = d.activities.find(a => a.id === q.get('id'))
-  const blank = (): Activity => ({ id: uid(), date: q.get('date') ?? todayISO(), type: (q.get('type') as Activity['type']) ?? 'corsa', sessionKey: q.get('key'), source: 'manuale' })
-  const [a, setA] = useState<Activity>(existing ?? blank())
-  const [dur, setDur] = useState(fromSec(existing?.seconds ?? (q.get('sec') ? +q.get('sec')! : null)))
+  const blank = (): Activity => {
+    const g = q.get('guide') ? local.get<GuideResult>(RESULT) : null
+    return { id: uid(), date: q.get('date') ?? todayISO(), type: (q.get('type') as Activity['type']) ?? 'corsa', sessionKey: q.get('key'), source: 'manuale', ...(g ?? {}) }
+  }
+  const [a, setA] = useState<Activity>(() => existing ?? blank())
+  const [dur, setDur] = useState(fromSec(existing?.seconds ?? a.seconds ?? (q.get('sec') ? +q.get('sec')! : null)))
+  const must = !custom && a.type === 'corsa' ? 'ginocchio' : undefined
+  const [pains, setPains] = useState<Pain[]>(() => painsOf(a, custom ? 'altro' : 'ginocchio'))
+  const shown = must && !pains.some(p => p.zone === must) ? [{ zone: must, level: a.knee ?? 0 }, ...pains] : pains
   const [msg, setMsg] = useState(''), [err, setErr] = useState(''), [saved, setSaved] = useState(false)
   const file = useRef<HTMLInputElement>(null)
   const up = (p: Partial<Activity>) => setA(x => ({ ...x, ...p }))
@@ -25,7 +35,7 @@ export function Log({ route }: { route: string }) {
   const near = options.filter(o => o.date === a.date || o.key === a.sessionKey)
   const linked = options.find(o => o.key === a.sessionKey)
   const applyFit = (f: FitResult, name: string) => {
-    const match = options.find(o => o.date === f.date)
+    const match = f.type === 'corsa' ? options.find(o => o.date === f.date) : undefined
     const { sport, laps, ...rest } = f
     setA(x => ({ ...x, ...rest, sessionKey: match?.key ?? x.sessionKey ?? null }))
     setDur(fromSec(f.seconds)); setErr('')
@@ -33,15 +43,16 @@ export function Log({ route }: { route: string }) {
   }
   const onFile = async (f?: File | null) => {
     if (!f) return
-    try { applyFit(parseFit(await f.arrayBuffer()), f.name) }
+    try { applyFit(await parseActivityFile(await f.arrayBuffer()), f.name) }
     catch (e: any) { setErr(e.message ?? 'Non riesco a leggere questo file.'); setMsg('') }
+    finally { if (file.current) file.current.value = '' }
   }
   useEffect(() => { // file ricevuto da "Condividi" su Android
     if (!location.search.includes('shared=1') || !('caches' in window)) return
     void (async () => {
       const c = await caches.open('btr-share'), r = await c.match('/shared.fit')
       if (r) {
-        try { applyFit(parseFit(await r.arrayBuffer()), decodeURIComponent(r.headers.get('x-name') ?? 'File FIT')) }
+        try { applyFit(await parseActivityFile(await r.arrayBuffer()), decodeURIComponent(r.headers.get('x-name') ?? 'File')) }
         catch (e: any) { setErr(e.message) }
         await c.delete('/shared.fit')
       }
@@ -53,7 +64,7 @@ export function Log({ route }: { route: string }) {
     const secs = dur ? toSec(dur) : null
     if (dur && secs == null) { setErr('Scrivi la durata come 45:30 oppure 1:12:00.'); return }
     if (a.type === 'corsa' && a.fatica == null) { setErr('Indica la fatica: serve a capire come procedere.'); return }
-    saveActivity({ ...a, seconds: secs }); setSaved(true); setErr('')
+    saveActivity({ ...withPains(a, shown), seconds: secs }); if (q.get('guide')) local.del(RESULT); setSaved(true); setErr('')
     setTimeout(() => nav('oggi'), 500)
   }
   const pace = paceOf(a.km, dur ? toSec(dur) : null)
@@ -62,9 +73,9 @@ export function Log({ route }: { route: string }) {
     <form class="stack form" onSubmit={save}>
       <section class="head"><h1>{existing ? 'Modifica allenamento' : 'Registra allenamento'}</h1></section>
       {linked && <section class="panel"><h2>{WEEKDAY[linked.x.day]}: {linked.x.text}</h2><Gauge fiato={linked.x.fiato} fatica={linked.x.fatica} /></section>}
-      {isRun && a.source !== 'fit' && <section class="panel"><h2>Hai il file del Suunto?</h2><p>Nell'app Suunto apri l'allenamento, tocca i tre puntini ed esporta il FIT.</p>
-        <input ref={file} type="file" accept=".fit,application/octet-stream" hidden onChange={e => onFile(e.currentTarget.files?.[0])} />
-        <button type="button" class="btn ghost" onClick={() => file.current?.click()}>Carica file FIT</button></section>}
+      {a.type !== 'forza' && (a.source === 'manuale' || a.source === 'gps') && <section class="panel"><h2>Hai il file dell'allenamento?</h2><p>Da Suunto, Garmin, Coros, Polar, Strava e altre app: esporta il file e caricalo qui.</p>
+        <input ref={file} type="file" hidden onChange={e => onFile(e.currentTarget.files?.[0])} />
+        <button type="button" class="btn ghost" onClick={() => file.current?.click()}>Carica file FIT, GPX o TCX</button></section>}
       {msg && <Note tone="go">{msg}</Note>}
       {a.type === 'forza' && !existing && <a class="btn ghost" href={`#/forza?date=${a.date}`}>Usa la scheda guidata</a>}
       {existing?.trace?.length ? <a class="btn ghost" href={`#/corsa?id=${existing.id}`}>Dettaglio corsa</a> : null}
@@ -85,18 +96,17 @@ export function Log({ route }: { route: string }) {
       {isRun && <Field label="Intertempi"><input value={a.splits ?? ''} onInput={e => up({ splits: e.currentTarget.value })} placeholder={`6'29" - 6'16"`} /></Field>}
       {isRun && <Scale label="Com'era il fiato?" max={5} value={a.fiato} onChange={v => up({ fiato: v })} hint={breathHint(a.fiato)} />}
       <Scale label="Quanta fatica?" max={10} value={a.fatica} onChange={v => up({ fatica: v })} />
-      {isRun && <Scale label={words.pain} min={0} max={10} value={a.knee} onChange={v => up({ knee: v })} />}
+      <PainPicker value={shown} onChange={setPains} required={must} />
       {isRun && <label class="check"><input type="checkbox" checked={!!a.locked} onChange={e => up({ locked: e.currentTarget.checked })} /> {words.locked}</label>}
       <Field label="Note"><textarea rows={3} value={a.note ?? ''} onInput={e => up({ note: e.currentTarget.value })} placeholder={isRun ? 'Sonno, freddo, intestino, sensazioni' : 'Esercizi, carichi, sensazioni'} /></Field>
       {err && <p class="err" role="alert">{err}</p>}
       <button class="btn" disabled={saved}>{saved ? 'Salvato' : 'Salva allenamento'}</button>
       {existing && <button type="button" class="btn ghost danger" onClick={() => { if (confirm('Eliminare questo allenamento?')) { deleteActivity(a.id); nav('oggi') } }}>Elimina allenamento</button>}
-      {!existing && <History />}
-    </form>
+          </form>
   )
 }
-function History() {
-  const list = [...data.value!.activities].reverse().slice(0, 8)
+export function History() {
+  const list = [...data.value!.activities].reverse().slice(0, 12)
   if (!list.length) return null
-  return <section><h2 class="phase">Ultimi registrati</h2><ul class="hist">{list.map(a => <li key={a.id}><a href={`#/registra?id=${a.id}`}><b>{fmtDate(a.date, { day: 'numeric', month: 'short' })}</b><span>{TYPES.find(t => t[0] === a.type)?.[1]}{a.km ? `, ${a.km} km` : ''}{a.fatica ? `, fatica ${a.fatica}` : ''}</span></a></li>)}</ul></section>
+  return <section><h2 class="phase">Storico</h2><ul class="hist">{list.map(a => <li key={a.id}><a href={`#/registra?id=${a.id}`}><b>{fmtDate(a.date, { day: 'numeric', month: 'short' })}</b><span>{TYPES.find(t => t[0] === a.type)?.[1]}{a.km ? `, ${a.km} km` : ''}{a.fatica ? `, fatica ${a.fatica}` : ''}</span></a></li>)}</ul></section>
 }

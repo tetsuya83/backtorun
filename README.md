@@ -1,6 +1,6 @@
 # BackToRun
 
-La tua app di preparazione alla maratona: piano, fiato e fatica attesi, registrazione manuale o da file FIT, lavori extra, test e andamento.
+La tua app di preparazione alla maratona: piano, allenamenti guidati a blocchi con GPS del telefono o orologio, registrazione manuale o da file FIT, GPX e TCX, dolori per zona del corpo, lavori extra, test, andamento e schede con animazioni nella sezione Impara.
 
 Ogni persona può usare il piano base, creare un piano per la propria gara (distanza, data, livello, giorni) oppure scrivere la propria tabella. Il piano personale sta in `user_plans`; il piano base resta quello di `shared/plan.json`. Il generatore è in `shared/generator.ts`.
 
@@ -18,7 +18,7 @@ Il database `backtorun-db` esiste già su Cloudflare e il suo ID è in `wrangler
 6. Apri l'indirizzo `workers.dev` con Chrome su Android, crea nome utente e password e installa l'app dal menu.
 7. Chiudi e riapri l'app una volta: da quel momento funziona anche senza rete.
 
-Dopo l'installazione, nell'app Suunto puoi usare **Condividi** sul file FIT e scegliere BackToRun.
+Dopo l'installazione, nell'app del tuo orologio puoi usare **Condividi** su un file FIT, GPX o TCX e scegliere BackToRun.
 
 ## Persone
 

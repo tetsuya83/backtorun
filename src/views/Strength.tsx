@@ -5,6 +5,10 @@ import { jointOk, lastLog, schemeFor, suggest, WORKOUTS, type Exercise, type Exe
 import { fmtDate, painWords, todayISO } from '../guide'
 import { buzz, clearScheduled, keepAwake, local, say, schedule, unlockSound } from '../sound'
 import { Field, nav, Note, Scale } from '../ui'
+import { Anim } from '../anim'
+import { articleById } from '../learn'
+import { withPains, type Pain } from '../../shared/pain'
+import { PainPicker } from './Pain'
 
 const KEY = 'btr-forza', PLACE = 'btr-forza-luogo'
 type Row = { kg: string; reps: string; done: boolean }
@@ -13,12 +17,12 @@ const fresh = (date: string, place: Place): Draft => ({ date, start: Date.now(),
 const num = (s: string) => { const n = +s.replace(',', '.'); return s.trim() && isFinite(n) ? n : null }
 
 function Card({ ex, s, d, set, onDone, ok }: { ex: Exercise; s: Scheme; d: Draft; set: (f: (x: Draft) => Draft) => void; onDone: (rest: number) => void; ok: boolean }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(false), [how, setHow] = useState(false)
   const act = d.alt[ex.id] && ex.alt ? { ...ex, ...ex.alt } as Exercise : ex
   const acts = data.value!.activities, last = lastLog(acts, act.id), tip = suggest(last, act, s, ok)
   const rows: Row[] = d.rows[act.id] ?? Array.from({ length: s.sets }, () => ({ kg: tip.kg != null ? String(tip.kg) : '', reps: '', done: false }))
   const up = (i: number, p: Partial<Row>) => set(x => ({ ...x, rows: { ...x.rows, [act.id]: rows.map((r, j) => j === i ? { ...r, ...p } : r) } }))
-  const n = rows.filter(r => r.done).length, finished = n === rows.length
+  const n = rows.filter(r => r.done).length, finished = n === rows.length, art = articleById(act.id === 'h-calfbent' ? 'calfseat' : act.id)
   return (
     <section class={'panel ex' + (finished ? ' done-ex' : '')}>
       <div class="ex-h"><h2>{act.name}</h2><span>{n}/{rows.length}</span></div>
@@ -26,6 +30,8 @@ function Card({ ex, s, d, set, onDone, ok }: { ex: Exercise; s: Scheme; d: Draft
       <p class="sub">{s.sets} × {s.min}-{s.max} {s.unit === 'sec' ? 'secondi' : 'ripetizioni'}{act.perSide ? ' per lato' : ''}, recupero {s.rest >= 60 ? `${Math.floor(s.rest / 60)}'${s.rest % 60 ? String(s.rest % 60).padStart(2, '0') + '"' : ''}` : `${s.rest}"`}</p>
       {(open || !finished) && <>
         <p>{act.cue}</p>
+        {art && <button type="button" class="link" aria-expanded={how} onClick={() => setHow(!how)}>{how ? 'Chiudi' : 'Vedi come si fa'}</button>}
+        {how && art?.anim && <><Anim id={art.anim} small /><a href={`#/impara/${art.id}`}>Scheda completa</a></>}
         {last && <p class="sub">L'ultima volta: {last.sets.map(x => (x.kg ? `${x.kg} kg × ` : '') + x.reps).join(', ')}</p>}
         <p class={tip.up ? 'up' : 'sub'}>{tip.text}</p>
         {ex.alt && !n && <button type="button" class="link" onClick={() => set(x => ({ ...x, alt: { ...x.alt, [ex.id]: !x.alt[ex.id] } }))}>Fai {(d.alt[ex.id] ? ex : ex.alt).name}</button>}
@@ -47,7 +53,7 @@ export function Strength({ route }: { route: string }) {
   const date = new URLSearchParams(route.split('?')[1] ?? '').get('date') ?? todayISO()
   const slot = useMemo(() => slotForDate(buildTimeline(plan, app.state), date), [plan, app.state, date])
   const [d, setD] = useState<Draft>(() => local.get<Draft>(KEY) ?? fresh(date, local.get<Place>(PLACE) ?? 'palestra'))
-  const [end, setEnd] = useState(0), [, tick] = useState(0), [fatica, setFatica] = useState<number | null>(null), [pain, setPain] = useState<number | null>(null)
+  const [end, setEnd] = useState(0), [, tick] = useState(0), [fatica, setFatica] = useState<number | null>(null), [pains, setPains] = useState<Pain[]>(() => isCustom(plan) ? [] : [{ zone: 'ginocchio', level: 0 }])
   const [note, setNote] = useState(''), [err, setErr] = useState('')
   const set = (f: (x: Draft) => Draft) => setD(x => { const n = f(x); local.set(KEY, n); return n })
   useEffect(() => keepAwake(), [])
@@ -74,7 +80,7 @@ export function Strength({ route }: { route: string }) {
     const sets = logs(d)
     if (!sets.length) { setErr('Spunta almeno una serie.'); return }
     if (fatica == null) { setErr('Indica la fatica.'); return }
-    saveActivity({ id: uid(), date, type: 'forza', source: 'manuale', seconds: Math.min(4 * 3600, Math.round((Date.now() - d.start) / 1000)), fatica, knee: pain, note: note.trim() || null, sets })
+    saveActivity(withPains({ id: uid(), date, type: 'forza' as const, source: 'manuale' as const, seconds: Math.min(4 * 3600, Math.round((Date.now() - d.start) / 1000)), fatica, note: note.trim() || null, sets }, pains))
     local.del(KEY); nav('oggi')
   }
   const last = [...app.activities].reverse().find(a => a.type === 'corsa')
@@ -90,7 +96,7 @@ export function Strength({ route }: { route: string }) {
       <div class="seg" role="group" aria-label="Dove ti alleni">{(['palestra', 'casa'] as Place[]).map(p => <button type="button" key={p} class={d.place === p ? 'sel' : ''} aria-pressed={d.place === p} disabled={logs(d).length > 0 && d.place !== p} onClick={() => { local.set(PLACE, p); set(x => ({ ...x, place: p })) }}>{p === 'palestra' ? 'Palestra' : 'Casa'}</button>)}</div>
       {items.map(({ ex, s }) => <Card key={ex.id} ex={ex} s={s} d={d} set={set} onDone={rest} ok={ok} />)}
       <Scale label="Quanta fatica?" max={10} value={fatica} onChange={setFatica} />
-      <Scale label={words.pain} min={0} max={10} value={pain} onChange={setPain} />
+      <PainPicker value={pains} onChange={setPains} />
       <Field label="Note"><textarea rows={2} value={note} onInput={e => setNote(e.currentTarget.value)} placeholder="Esercizi saltati, sensazioni" /></Field>
       {err && <p class="err" role="alert">{err}</p>}
       <button class="btn" onClick={save}>Salva allenamento</button>

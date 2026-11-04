@@ -3,7 +3,9 @@ import { data, saveState } from '../api'
 import { addDays, buildTimeline, isCustom, planFor, sessionDate, sessionKey, slotForDate, strengthDays, type Slot } from '../../shared/engine'
 import { dayList, fmtDate, STRENGTH, todayISO, WEEKDAY } from '../guide'
 import { phaseName, weekLabel } from './Today'
-import { Gauge } from '../ui'
+import { BlockList, Gauge } from '../ui'
+import { blocksOf } from '../../shared/blocks'
+import { learnFor } from '../learn'
 
 function WeekRow({ s, open, toggle, current }: { s: Slot; open: boolean; toggle: () => void; current: boolean }) {
   const d = data.value!, plan = planFor(d), custom = isCustom(plan), force = strengthDays(plan)
@@ -24,11 +26,13 @@ function WeekRow({ s, open, toggle, current }: { s: Slot; open: boolean; toggle:
         {force.length > 0 && <p class="strength">Forza {dayList(force)}: {STRENGTH[String(s.phase)] ?? STRENGTH['1']}</p>}
         {!s.sessions.length && <p class="sub">Settimana da compilare. <a href="#/mio-piano/modifica">Modifica il piano</a></p>}
         {s.sessions.map(x => {
-          const date = sessionDate(s, x.day), key = sessionKey(s, x.day), a = d.activities.find(z => z.sessionKey === key)
+          const date = sessionDate(s, x.day), key = sessionKey(s, x.day), a = d.activities.find(z => z.sessionKey === key), b = blocksOf(x), art = learnFor(x.text)
           return <div class="ses" key={x.day}>
             <div class="ses-h"><b>{WEEKDAY[x.day]} {fmtDate(date, { day: 'numeric' })}</b>{a ? <a href={`#/registra?id=${a.id}`}>Fatto, modifica</a> : x.km !== 0 && <a href={`#/registra?key=${key}&date=${date}`}>Registra</a>}</div>
             <p>{x.text}</p>
+            {b && b.length > 1 && x.km !== 0 && <BlockList blocks={b} compact />}
             <Gauge fiato={x.fiato} fatica={x.fatica} />
+            <div class="b-act">{b && x.km !== 0 && !a && <a href={`#/guida?key=${key}&date=${date}`}>Avvia guidato</a>}{art && <a href={`#/impara/${art.id}`}>Cos'è</a>}</div>
           </div>
         })}
         {!s.maintenance && (custom || n <= 34) && <div class="row">

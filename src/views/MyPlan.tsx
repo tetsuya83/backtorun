@@ -3,7 +3,9 @@ import { data, saveCustomPlan, saveState, startCustomPlan, uid, switchPlan } fro
 import { addDays, DAYS, mondayOf, planError, type Day, type Plan, type Session, type Week } from '../../shared/engine'
 import { blankPlan, generatePlan, MAX_KM, MIN_KM, RACES, type GoalInput, type RaceType } from '../../shared/generator'
 import { fmtDate, todayISO, WEEKDAY } from '../guide'
-import { Field, nav, Note } from '../ui'
+import { BlockList, Field, nav, Note } from '../ui'
+import { blocksOf } from '../../shared/blocks'
+import { Builder } from './Builder'
 
 const SHORT: Record<Day, string> = { lun: 'L', mar: 'M', mer: 'M', gio: 'G', ven: 'V', sab: 'S', dom: 'D' }
 const num = (v: string) => v === '' ? 0 : +v.replace(',', '.') || 0
@@ -135,17 +137,22 @@ export function BlankPlan() {
 }
 
 const BREATHS = ['Mai fiatone', 'Frasi complete', 'Frasi brevi, niente fiatone', 'Fiatone ok nei tratti, calmo nei recuperi', 'Fiato al limite']
-function SessionEdit({ s, taken, up, remove }: { s: Session; taken: Day[]; up: (p: Partial<Session>) => void; remove: () => void }) {
+function SessionEdit({ s, taken, up, remove, wizard }: { s: Session; taken: Day[]; up: (p: Partial<Session>) => void; remove: () => void; wizard: () => void }) {
+  const b = blocksOf(s), [manual, setManual] = useState(false)
   return <div class="ses edit">
     <div class="grid2">
       <Field label="Giorno"><select value={s.day} onChange={e => up({ day: e.currentTarget.value as Day })}>{DAYS.filter(d => d === s.day || !taken.includes(d)).map(d => <option key={d} value={d}>{WEEKDAY[d]}</option>)}</select></Field>
       <Field label="Km"><input inputMode="decimal" value={s.km ?? ''} onInput={e => { const v = e.currentTarget.value; up({ km: v === '' ? null : num(v) }) }} /></Field>
     </div>
-    <Field label="Cosa prevede"><input value={s.text} placeholder="Facile 6 km" onInput={e => up({ text: e.currentTarget.value })} /></Field>
+    {b ? <BlockList blocks={b} /> : s.text ? <p class="sub">{s.text}</p> : <p class="sub">Seduta da costruire.</p>}
+    <button type="button" class="btn ghost" onClick={wizard}>{b ? 'Modifica i blocchi' : 'Costruisci la seduta'}</button>
+    <button type="button" class="link" aria-expanded={manual} onClick={() => setManual(!manual)}>{manual ? 'Chiudi' : 'Scrivila a mano'}</button>
+    {manual && <>
+    <Field label="Cosa prevede"><input value={s.text} placeholder="Facile 6 km" onInput={e => up({ text: e.currentTarget.value, blocks: null })} /></Field>
     <div class="grid2">
-      <Field label="Fiato atteso"><select value={s.fiato ?? ''} onChange={e => up({ fiato: e.currentTarget.value || null })}><option value="">Non indicato</option>{[...new Set([...BREATHS, ...(s.fiato ? [s.fiato] : [])])].map(b => <option key={b} value={b}>{b}</option>)}</select></Field>
+      <Field label="Fiato atteso"><select value={s.fiato ?? ''} onChange={e => up({ fiato: e.currentTarget.value || null })}><option value="">Non indicato</option>{[...new Set([...BREATHS, ...(s.fiato ? [s.fiato] : [])])].map(x => <option key={x} value={x}>{x}</option>)}</select></Field>
       <Field label="Fatica attesa"><input value={s.fatica ?? ''} placeholder="3-4" onInput={e => up({ fatica: e.currentTarget.value || null })} /></Field>
-    </div>
+    </div></>}
     <button type="button" class="link danger" onClick={remove}>Togli questa seduta</button>
   </div>
 }
@@ -154,7 +161,7 @@ function SessionEdit({ s, taken, up, remove }: { s: Session; taken: Day[]; up: (
 export function EditPlan() {
   const d = data.value!
   const [p, setP] = useState<Plan | null>(d.custom ?? null)
-  const [open, setOpen] = useState<number | null>(0), [err, setErr] = useState(''), [saved, setSaved] = useState(false)
+  const [open, setOpen] = useState<number | null>(0), [err, setErr] = useState(''), [saved, setSaved] = useState(false), [wiz, setWiz] = useState<{ i: number; j: number } | null>(null)
   if (!p) return <div class="stack"><section class="head"><h1>Nessun piano personale</h1><a class="btn" href="#/mio-piano">Crea il tuo piano</a></section></div>
   const weeks = (fn: (w: Week[]) => Week[]) => { setP({ ...p, weeks: fn(p.weeks) }); setSaved(false); setErr('') }
   const week = (i: number, u: Partial<Week>) => weeks(l => l.map((w, j) => j === i ? { ...w, ...u } : w))
@@ -162,6 +169,10 @@ export function EditPlan() {
   const addSession = (i: number) => {
     const w = p.weeks[i], day = DAYS.find(x => !w.sessions.some(s => s.day === x))
     if (day) week(i, { sessions: [...w.sessions, { day, text: '', km: null, fiato: null, fatica: null }] })
+  }
+  if (wiz) {
+    const w = p.weeks[wiz.i], x = w.sessions[wiz.j]
+    return <Builder initial={x.text ? blocksOf(x) : null} fiato={x.fiato} fatica={x.fatica} onCancel={() => setWiz(null)} onDone={r => { week(wiz.i, { sessions: w.sessions.map((y, k) => k === wiz.j ? { ...y, blocks: r.blocks, text: r.text, km: r.km ?? y.km, fiato: r.fiato || null, fatica: r.fatica || null } : y) }); setWiz(null) }} />
   }
   const save = () => {
     const e = planError(p); if (e) { setErr(e); return }
@@ -186,7 +197,7 @@ export function EditPlan() {
         {open === i && <div class="wk-body">
           {w.sessions.map((s, j) => <SessionEdit key={j} s={s} taken={w.sessions.map(x => x.day)}
             up={u => week(i, { sessions: w.sessions.map((x, k) => k === j ? { ...x, ...u } : x) })}
-            remove={() => week(i, { sessions: w.sessions.filter((_, k) => k !== j) })} />)}
+            remove={() => week(i, { sessions: w.sessions.filter((_, k) => k !== j) })} wizard={() => setWiz({ i, j })} />)}
           {w.sessions.length < 7 && <button type="button" class="btn ghost" onClick={() => addSession(i)}>Aggiungi seduta</button>}
           <label class="check"><input type="checkbox" checked={w.scarico} onChange={e => week(i, { scarico: e.currentTarget.checked })} /> Settimana di scarico</label>
           <div class="row">

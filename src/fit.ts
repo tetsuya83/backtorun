@@ -1,12 +1,13 @@
 import { Decoder, Stream } from '@garmin/fitsdk'
 import type { Activity } from '../shared/engine'
+import { parseXmlTrack } from '../shared/track'
 export type FitResult = Partial<Activity> & { date: string; sport: string; laps: number }
 const fmt = (s: number) => `${Math.floor(s / 60)}'${String(Math.round(s % 60)).padStart(2, '0')}"`
 const avg = (a: number[]) => a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length) : null
 
 export function parseFit(buf: ArrayBuffer): FitResult {
   const stream = Stream.fromArrayBuffer(buf)
-  if (!Decoder.isFIT(stream)) throw new Error('Questo file non è un FIT valido.')
+  if (!Decoder.isFIT(stream)) throw new Error('Formato non riconosciuto. Usa un file FIT, GPX o TCX.')
   const dec = new Decoder(stream)
   const { messages, errors } = dec.read({ convertDateTimesToDates: true, convertTypesToStrings: true, applyScaleAndOffset: true, expandSubFields: true, expandComponents: true, mergeHeartRates: true })
   const sess = (messages.sessionMesgs ?? [])[0] as any
@@ -45,6 +46,17 @@ export function parseFit(buf: ArrayBuffer): FitResult {
     splits: splits.join(' - ') || null, trace,
     cadence: cadence ? Math.round(cadence * twice) : null, ascent: sess?.totalAscent != null ? Math.round(sess.totalAscent) : ref != null ? Math.round(gain) : null,
   }
+}
+async function gunzip(buf: ArrayBuffer) {
+  return new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()
+}
+/** Legge FIT, GPX e TCX di qualsiasi marca, anche compressi in .gz come negli archivi di Strava. */
+export async function parseActivityFile(buf: ArrayBuffer): Promise<FitResult> {
+  const head = new Uint8Array(buf.slice(0, 2))
+  if (head[0] === 0x1f && head[1] === 0x8b) buf = await gunzip(buf)
+  const text = new TextDecoder().decode(buf.slice(0, 4000))
+  if (/<(\?xml|gpx|TrainingCenterDatabase)\b/i.test(text)) return parseXmlTrack(new TextDecoder().decode(buf))
+  return parseFit(buf)
 }
 export const paceOf = (km?: number | null, s?: number | null) => km && s ? fmt(s / km) + '/km' : null
 export const timeOf = (s?: number | null) => { if (!s) return null; const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = Math.round(s % 60); return h ? `${h}h${String(m).padStart(2, '0')}'` : `${m}'${String(x).padStart(2, '0')}"` }

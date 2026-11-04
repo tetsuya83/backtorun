@@ -5,6 +5,7 @@ import { hrMaxOf, loadAlert, samePace, weeklyLoads, zonesFrom } from '../../shar
 import { Field, Note } from '../ui'
 import { addDays, buildTimeline, isCustom, planFor, sessionKey, upper, type Slot } from '../../shared/engine'
 import { fmtDate, painWords, todayISO } from '../guide'
+import { zoneCounts, zoneLabel } from '../../shared/pain'
 import { paceOf } from '../fit'
 
 const W = 340
@@ -53,7 +54,7 @@ export function Trends() {
   const win: Slot[] = t.slots.slice(Math.max(0, end - 12), end)
   const rows = win.map(s => ({ label: fmtDate(s.monday, { day: 'numeric', month: 'numeric' }), plan: s.total ? Math.round(s.total) : null, done: Math.round(runs.filter(a => a.date >= s.monday && a.date < addDays(s.monday, 7)).reduce((x, a) => x + (a.km ?? 0), 0) * 10) / 10 }))
   const ses = new Map(t.slots.flatMap(s => s.sessions.map(x => [sessionKey(s, x.day), x] as const)))
-  const last = runs.slice(-16)
+  const last = runs.slice(-16), acts0 = d.activities.slice(-30), zones = zoneCounts(acts0.filter(a => a.pains), 1)
   const fat = last.filter(a => a.fatica != null).map(a => ({ label: fmtDate(a.date, { day: 'numeric', month: 'short' }), v: a.fatica!, t: a.sessionKey ? upper(ses.get(a.sessionKey)?.fatica) : null }))
   const knee = last.filter(a => a.knee != null).map(a => ({ label: fmtDate(a.date, { day: 'numeric', month: 'short' }), v: a.knee! }))
   const hrm = hrMaxOf(d), z2 = hrm ? zonesFrom(hrm)[1] : null
@@ -72,7 +73,8 @@ export function Trends() {
       {alert && <Note><strong>Carico in salita.</strong> Questa settimana sei a {alert.load}, il {alert.pct}% sopra la media recente di {alert.avg}. Se non lo hai scelto tu, tieni facili le prossime sedute.</Note>}
       {loads.some(w => w.load > 0) && <><Bars rows={shown.map(w => ({ label: fmtDate(w.monday, { day: 'numeric', month: 'numeric' }), done: w.load, plan: null }))} title="Carico settimanale" unit="punti" /><p class="sub pad">Minuti per fatica di tutti gli allenamenti.{noLoad ? ` ${noLoad} senza durata o fatica non sono conteggiati.` : ''}</p></>}
       {fat.length > 1 && <Line pts={fat} max={10} title="Fatica reale e attesa" unit="/10" />}
-      {knee.length > 1 && <Line pts={knee} max={10} title={painWords(isCustom(plan)).chart} unit="/10" ref2={2} />}
+      {knee.length > 1 && <Line pts={knee} max={10} title={acts0.some(a => a.pains?.some(p => p.zone !== 'ginocchio')) ? 'Dolore, valore più alto' : painWords(isCustom(plan)).chart} unit="/10" ref2={2} />}
+      {zones.length > 0 && <section class="panel"><h2>Zone che hanno dato dolore</h2><table class="splits"><tbody>{zones.map(z => <tr key={z.zone}><td>{zoneLabel(z.zone)}</td><td>{z.times} {z.times === 1 ? 'volta' : 'volte'}</td><td>fino a {z.top}</td></tr>)}</tbody></table><p>Negli ultimi 30 allenamenti. Se una zona torna spesso, conviene farla valutare.</p></section>}
       <Loads />
       {!z2 && <p class="sub pad"><a href="#/impostazioni">Imposta la FC massima</a> per vedere il ritmo in Z2.</p>}
       {cad.length > 1 && <Line pts={cad} min={Math.min(...cad.map(c => c.v)) - 6} max={Math.max(...cad.map(c => c.v)) + 6} title="Cadenza a ritmo simile" unit=" passi/min" />}

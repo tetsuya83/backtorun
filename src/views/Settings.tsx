@@ -3,11 +3,12 @@ import { useEffect, useRef, useState } from 'preact/hooks'
 import { call, clearLocal, data, load, saveCustomPlan, saveState } from '../api'
 import { Field, Note } from '../ui'
 import { isCustom, moveRace, planFor, type Activity } from '../../shared/engine'
+import { painText } from '../../shared/pain'
 
 const save = (name: string, text: string, type: string) => { const u = URL.createObjectURL(new Blob([text], { type })); const a = document.createElement('a'); a.href = u; a.download = name; a.click(); URL.revokeObjectURL(u) }
-const CSV = ['date', 'type', 'source', 'km', 'seconds', 'hrAvg', 'hrMax', 'hrLast', 'splits', 'fiato', 'fatica', 'knee', 'swelling', 'locked', 'note', 'sessionKey', 'cadence', 'ascent'] as const
+const CSV = ['date', 'type', 'source', 'km', 'seconds', 'hrAvg', 'hrMax', 'hrLast', 'splits', 'fiato', 'fatica', 'knee', 'pains', 'swelling', 'locked', 'note', 'sessionKey', 'cadence', 'ascent'] as const
 const scheda = (a: Activity) => (a.sets ?? []).map(x => `${x.name}: ${x.sets.map(s => (s.kg ? `${s.kg}kg×` : '') + s.reps).join(' ')}`).join(' | ')
-const csv = (l: Activity[]) => [[...CSV, 'scheda'].join(';'), ...l.map(a => [...CSV.map(k => a[k]), scheda(a) || null].map(v => v == null ? '' : `"${String(v).replace(/"/g, '""')}"`).join(';'))].join('\n')
+const csv = (l: Activity[]) => [[...CSV, 'scheda'].join(';'), ...l.map(a => [...CSV.map(k => k === 'pains' ? (a.pains ?? []).map(p => `${painText(p)} ${p.level}`).join(' | ') || null : a[k]), scheda(a) || null].map(v => v == null ? '' : `"${String(v).replace(/"/g, '""')}"`).join(';'))].join('\n')
 interface Person { id: number; name: string; isAdmin: number; activities: number }
 function People() {
   const [info, setInfo] = useState<{ users: Person[]; openInvites: number; max: number } | null>(null)
@@ -66,13 +67,16 @@ export function Settings({ onLogout }: { onLogout: () => void }) {
   }
   return (
     <div class="stack form">
-      <section class="head"><h1>Impostazioni</h1></section>
+      <section class="head"><h1>Profilo</h1></section>
       <h2 class="phase">Piano</h2>
       <a class="btn ghost" href="#/mio-piano">{custom ? d.custom!.meta.name : 'Piano base'}: cambia o crea il tuo</a>
       <h2 class="phase">Calendario</h2>
       <Field label="Inizio del piano"><input type="date" value={st.startDate} onChange={e => saveState({ ...st, startDate: e.currentTarget.value })} /></Field>
       {!custom && <Field label="Settimana di partenza"><input type="number" min={1} max={34} value={st.startWeek} onChange={e => saveState({ ...st, startWeek: Math.min(34, Math.max(1, +e.currentTarget.value || 1)) })} /></Field>}
       <Heart />
+      <h2 class="phase">Orologio</h2>
+      <Field label="Il tuo orologio"><select value={st.watch ?? ''} onChange={e => saveState({ ...st, watch: e.currentTarget.value || null })}><option value="">Nessuno: uso il GPS del telefono</option>{['Suunto', 'Garmin', 'Coros', 'Polar', 'Apple Watch', 'Altro'].map(x => <option key={x} value={x}>{x}</option>)}</select></Field>
+      <p class="sub pad">Serve a scegliere come misurare la distanza negli allenamenti guidati. I dati si importano da file FIT, GPX o TCX, di qualsiasi marca.</p>
       <h2 class="phase">Gara</h2>
       <Field label={custom ? 'Data della gara' : 'Data della maratona'}><input type="date" value={st.raceDate ?? ''} onChange={e => {
         const v = e.currentTarget.value || null

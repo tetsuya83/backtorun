@@ -35,7 +35,7 @@ export function Tests() {
       </section>
       <Scale label="Fiato" max={5} value={r.fiato} onChange={v => up({ fiato: v })} hint={breathHint(r.fiato)} />
       <Scale label="Fatica" max={10} value={r.fatica} onChange={v => up({ fatica: v })} />
-      <Scale label="Ginocchio" min={0} max={10} value={r.knee} onChange={v => up({ knee: v })} />
+      <Scale label={custom ? 'Dolore' : 'Ginocchio'} min={0} max={10} value={r.knee} onChange={v => up({ knee: v })} />
       <div class="grid2">
         <Field label="FC a fine corsa"><input inputMode="numeric" value={r.hrEnd ?? ''} onInput={e => up({ hrEnd: num(e.currentTarget.value) })} /></Field>
         <Field label="FC dopo 1' di cammino"><input inputMode="numeric" value={r.hr1 ?? ''} onInput={e => up({ hr1: num(e.currentTarget.value) })} /></Field>

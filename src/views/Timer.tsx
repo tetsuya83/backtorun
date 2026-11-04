@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { intervalSteps, parseIntervals, routineById, ROUTINES, stepAt, totalOf, type Intervals, type Step } from '../../shared/training'
 import { buzz, clearScheduled, keepAwake, local, say, schedule, unlockSound, type Cue } from '../sound'
 import { Field, Note } from '../ui'
+import { Anim, sceneForStep } from '../anim'
 import { timeOf } from '../fit'
 
 const clock = (s: number) => { const t = Math.max(0, Math.ceil(s)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}` }
@@ -44,15 +45,16 @@ function Player({ steps, sig, title, note, after, lockable }: { steps: Step[]; s
     }, 250)
     return () => { clearInterval(iv); stop() }
   }, [sig])
-  const s = stepAt(steps, at()), cur = steps[s.i], next = steps[s.i + 1]
+  const s = stepAt(steps, at()), cur = steps[s.i], next = steps[s.i + 1], scene = sceneForStep(cur.label)
   const hold = useRef<any>(null)
-  if (ended) return <div class="stack"><section class="hero"><p class="eyebrow">{title}</p><h1>Finito</h1><p class="sub">{timeOf(Math.round(clk.current.worked)) ?? `0'00"`} di allenamento.</p></section>{after?.(Math.round(clk.current.worked))}<a class="btn ghost" href="#/oggi">Torna a Oggi</a></div>
+  if (ended) return <div class="stack"><section class="hero"><p class="eyebrow">{title}</p><h1>Finito</h1><p class="sub">{timeOf(Math.round(clk.current.worked)) ?? `0'00"`} di allenamento.</p></section>{after?.(Math.round(clk.current.worked))}<a class="btn ghost" href="#/oggi">Torna ad Allenati</a></div>
   return (
     <div class="stack timer" data-tone={cur.tone}>
       <p class="eyebrow">{title}</p>
       <section class="tm" aria-live="off">
         <p class="tm-label">{cur.label}</p>
         <p class="tm-time">{clock(s.left)}</p>
+        {cur.tone === 'move' && scene && <Anim key={scene} id={scene} small />}
         {cur.cue && <p class="tm-cue">{cur.cue}</p>}
         <div class="tm-bar"><i style={{ width: `${Math.min(100, at() / total * 100)}%` }} /></div>
         <p class="sub">{next ? `Poi: ${next.label} ${clock(next.seconds)}` : 'Ultimo tratto'}, restano {clock(total - at())}</p>
