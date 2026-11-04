@@ -1,8 +1,8 @@
 import { data, saveState } from '../api'
 import { buildTimeline, DAYS, isCustom, planFor, reviewWeek, sessionDate, sessionKey, slotForDate, strengthDays, type Activity, type Plan, type Slot } from '../../shared/engine'
 import { fmtDate, MONTHS, STRENGTH, STRENGTH_LIST, todayISO } from '../guide'
-import { BlockList, Gauge, Note } from '../ui'
-import { blocksOf } from '../../shared/blocks'
+import { BlockList, Note } from '../ui'
+import { blocksOf, sessionTone } from '../../shared/blocks'
 import { learnFor } from '../learn'
 import { sessionMin } from '../../shared/tips'
 import { BodyAlerts } from './Home'
@@ -19,14 +19,19 @@ function SessionHero({ s, date, done, label }: { s: Slot; date: string; done?: A
   const max = hrMaxOf(data.value!)
   const ses = s.sessions.find(x => sessionDate(s, x.day) === date)!
   const hint = zoneHint(`${ses.text} ${ses.fiato ?? ''}`, max ? zonesFrom(max) : null)
-  const blocks = blocksOf(ses), art = learnFor(ses.text), warm = warmupFor(ses.text), cool = cooldownFor(ses.text, ses.km), run = ses.km !== 0
+  const blocks = blocksOf(ses), art = learnFor(ses.text), tone = sessionTone(ses), warm = warmupFor(ses.text), cool = cooldownFor(ses.text, ses.km), run = ses.km !== 0
   return (
-    <section class="hero">
-      <p class="eyebrow">{label}</p>
-      <h1>{ses.text}</h1>
-      {ses.km ? <p class="bigkm"><b>{Math.round(ses.km * 10) / 10}</b> km</p> : null}
-      {blocks && blocks.length > 1 && run && <BlockList blocks={blocks} />}
-      <Gauge fiato={ses.fiato} fatica={ses.fatica} />
+    <div class="stack">
+      <section class="head ses-h">
+        <div class="pill-row"><p class="eyebrow">{label}</p>{tone && <span class={'pill ' + tone.key}>{tone.label}</span>}</div>
+        <h1>{ses.text}</h1>
+        {ses.km ? <p class="bigkm"><b>{Math.round(ses.km * 10) / 10}</b> km</p> : null}
+      </section>
+      {blocks && run && <section class="panel"><BlockList blocks={blocks} /></section>}
+      {(ses.fiato || ses.fatica) && <div class="facts">
+        {ses.fiato && <div><small>Fiato</small><b>{ses.fiato}</b></div>}
+        {ses.fatica && <div><small>Fatica</small><b>{/^\d/.test(ses.fatica) ? `${ses.fatica} su 10` : ses.fatica}</b></div>}
+      </div>}
       {hint && <p class="zonehint">{hint}</p>}
       {done
         ? <div class="done"><strong>Registrato</strong><span>{[done.km ? done.km + ' km' : null, timeOf(done.seconds), paceOf(done.km, done.seconds), done.fatica ? `fatica ${done.fatica}` : null].filter(Boolean).join(', ')}</span><a href={`#/registra?id=${done.id}`}>Modifica</a></div>
@@ -37,9 +42,9 @@ function SessionHero({ s, date, done, label }: { s: Slot; date: string; done?: A
         </>}
       {done?.trace?.length ? <a class="btn ghost" href={`#/corsa?id=${done.id}`}>Dettaglio corsa</a> : null}
       {done && <a class="btn ghost" href={`#/routine?id=${cool.id}`}>{cool.name}, {mins(cool)}</a>}
-      {art && <a href={`#/impara/${art.id}`}>Cos'è e a cosa serve: {art.title.toLowerCase()}</a>}
-      {sessionMin(ses) >= 60 && <a href="#/impara/calcolatore-lungo">Cosa portare da mangiare e bere</a>}
-    </section>
+      {art && <a class="ses-l" href={`#/impara/${art.id}`}>Cos'è e a cosa serve: {art.title.toLowerCase()}</a>}
+      {sessionMin(ses) >= 60 && <a class="ses-l" href="#/impara/calcolatore-lungo">Cosa portare da mangiare e bere</a>}
+    </div>
   )
 }
 

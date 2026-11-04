@@ -157,6 +157,14 @@ export function parseBlocks(text: string, km?: number | null): Block[] | null {
   return null
 }
 /** I blocchi della seduta: quelli salvati oppure quelli letti dal testo. */
+/** Lo sforzo della seduta, per il suo colore: conta il tratto più impegnativo. */
+export function sessionTone(s: { text: string; km?: number | null; blocks?: Block[] | null }): { key: 'easy' | 'mid' | 'hard'; label: string } | null {
+  if (s.km === 0) return null
+  const b = blocksOf(s)
+  if (!b?.length) return null
+  const top = Math.max(...b.map(x => EFFORTS[x.part.effort].level))
+  return top >= 4 ? { key: 'hard', label: 'Forte' } : top === 3 ? { key: 'mid', label: 'Medio' } : { key: 'easy', label: 'Facile' }
+}
 export const blocksOf = (s: { text: string; km?: number | null; blocks?: Block[] | null }) => s.blocks?.length ? s.blocks : parseBlocks(s.text, s.km)
 
 const okPart = (p: any, minSec: number) => !!p && p.effort in EFFORTS && (p.sec != null || p.m != null) && (p.sec == null || (p.sec >= minSec && p.sec <= 21600)) && (p.m == null || (p.m >= 10 && p.m <= 200000))

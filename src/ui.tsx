@@ -1,7 +1,7 @@
 import type { ComponentChildren } from 'preact'
 import { BREATH, breathLevel } from './guide'
 import { upper } from '../shared/engine'
-import { blockSec, blockText, EFFORTS, kindLabel, type Block, type Sport } from '../shared/blocks'
+import { blockSec, blockText, EFFORTS, effortInfo, kindLabel, type Block, type Sport } from '../shared/blocks'
 export const nav = (p: string) => { location.hash = '#/' + p }
 export function Gauge({ fiato, fatica }: { fiato?: string | null; fatica?: string | null }) {
   const b = breathLevel(fiato)
@@ -36,10 +36,11 @@ export function Field({ label, children }: { label: string; children: ComponentC
 export const breathHint = (v?: number | null) => v ? BREATH[v - 1] : undefined
 /** Lo schema della seduta: l'altezza è l'intensità, la larghezza la durata stimata. */
 export function BlockList({ blocks, compact, sport }: { blocks: Block[]; compact?: boolean; sport?: Sport }) {
-  const segs = blocks.flatMap(b => { const n = Math.min(b.reps ?? 1, 12), each = blockSec(b, sport) / n; return Array.from({ length: n }, () => b.rest ? [{ e: b.part.effort, w: each * .5 }, { e: b.rest.effort, w: each * .5 }] : [{ e: b.part.effort, w: each }]).flat() })
-  const tot = segs.reduce((a, x) => a + x.w, 0) || 1
+  const segs = blocks.flatMap(b => { const n = Math.min(b.reps ?? 1, 12), one: Block = { ...b, reps: 1, rest: undefined }, each = blockSec(b, sport) / (b.reps ?? 1); return Array.from({ length: n }, () => b.rest ? [{ e: b.part.effort, w: blockSec(one, sport) }, { e: b.rest.effort, w: blockSec({ ...one, part: b.rest }, sport) }] : [{ e: b.part.effort, w: each }]).flat() })
+  const tot = segs.reduce((a, x) => a + x.w, 0) || 1, top = Math.max(...segs.map(x => EFFORTS[x.e].level)), kinds = [...new Set(segs.map(x => x.e))].sort((a, b) => EFFORTS[b].level - EFFORTS[a].level)
   return <div class="schema">
-    <div class="profile" style={{ height: `${Math.max(...segs.map(x => EFFORTS[x.e].level)) * 11}px` }} role="img" aria-label={blocks.map(b => blockText(b, sport)).join(', ')}>{segs.map((x, i) => <i key={i} data-level={EFFORTS[x.e].level} style={{ flexGrow: Math.max(x.w / tot * 100, 1.6), height: `${EFFORTS[x.e].level * 100 / Math.max(...segs.map(y => EFFORTS[y.e].level))}%` }} />)}</div>
+    <div class={compact ? 'profile' : 'profile big'} role="img" aria-label={blocks.map(b => blockText(b, sport)).join(', ')}>{segs.map((x, i) => <i key={i} data-level={EFFORTS[x.e].level} style={{ flexGrow: Math.max(x.w / tot * 100, 1.6), height: `${EFFORTS[x.e].level * 100 / top}%` }} />)}</div>
+    {!compact && <div class="legend" aria-hidden="true">{kinds.map(e => <span key={e}><i data-level={EFFORTS[e].level} />{effortInfo(e, sport).label}</span>)}</div>}
     {!compact && <ol>{blocks.map((b, i) => <li key={i}><span>{kindLabel(b.kind, sport)}</span><b>{blockText(b, sport)}</b></li>)}</ol>}
   </div>
 }

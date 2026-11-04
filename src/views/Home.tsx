@@ -1,6 +1,6 @@
 import { data, saveActivity } from '../api'
 import { addDays, buildTimeline, isCustom, planFor, sessionDate, sessionKey, slotForDate, DAYS, strengthDays } from '../../shared/engine'
-import { blocksOf } from '../../shared/blocks'
+import { blocksOf, sessionTone } from '../../shared/blocks'
 import { painsOf, painText } from '../../shared/pain'
 import { fmtDate, PAIN as words, STRENGTH, todayISO } from '../guide'
 import { BlockList, Note } from '../ui'
@@ -8,6 +8,7 @@ import { History } from './Log'
 import { PlannedToday } from './Workouts'
 import { WeatherCard } from './Weather'
 import { PlanTip } from './Tools'
+import { weekLabel } from './Today'
 import { APP_VERSION } from '../changelog'
 
 /** Avvisi sul corpo: stanno in Home e in Allenati perché non devono sfuggire. */
@@ -38,7 +39,19 @@ const ICON = {
   chart: 'M5 19v-6M12 19V6M19 19v-9',
   user: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0',
 }
-const Ic = ({ d }: { d: string }) => <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={d} /></svg>
+const Ic = ({ d }: { d: string }) => <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={d} /></svg>
+const LETTERS = ['L', 'M', 'M', 'G', 'V', 'S', 'D'], WEEKDAYS = ['lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato', 'domenica']
+/** La settimana a colpo d'occhio: il colore del pallino è lo sforzo, viola la forza. */
+function WeekStrip() {
+  const d = data.value!, plan = planFor(d), t = buildTimeline(plan, d.state), today = todayISO(), slot = slotForDate(t, today) ?? (today < t.slots[0].monday ? t.slots[0] : undefined)
+  if (!slot) return null
+  const days = DAYS.map(day => {
+    const ses = slot.sessions.find(x => x.day === day), tone = ses ? sessionTone(ses) : null
+    const kind = tone?.key ?? (strengthDays(plan).includes(day) && !ses ? 'gym' : '')
+    return { kind, on: sessionDate(slot, day) === today, word: kind === 'gym' ? 'forza' : tone?.label.toLowerCase() ?? 'libero' }
+  })
+  return <div class="week" role="img" aria-label={`La tua settimana: ${days.map((x, i) => `${WEEKDAYS[i]} ${x.word}`).join(', ')}`}>{days.map((x, i) => <span key={i} class={x.on ? 'on' : ''}>{LETTERS[i]}<i class={x.kind} /></span>)}</div>
+}
 const name = (s?: string) => s ? s[0].toUpperCase() + s.slice(1) : ''
 export function Home() {
   const d = data.value!, plan = planFor(d), t = buildTimeline(plan, d.state), today = todayISO(), first = t.slots[0]
@@ -47,14 +60,15 @@ export function Home() {
   const wd = (new Date(today + 'T12:00:00Z').getUTCDay() + 6) % 7, force = strengthDays(plan).includes(DAYS[wd]) && !ses
   const gym = d.activities.find(a => a.type === 'forza' && a.date === today)
   const blocks = ses && ses.km !== 0 ? blocksOf(ses) : null, key = slot && ses ? sessionKey(slot, ses.day) : ''
-  const started = today >= first.monday
+  const started = today >= first.monday, tone = started && ses ? sessionTone(ses) : null
   return <div class="stack">
     <section class="home-h"><p>{fmtDate(today)}</p><h1>{d.me?.name ? `Ciao ${name(d.me.name)}` : 'Ciao'}</h1><p>Cosa vuoi fare oggi?</p></section>
     <BodyAlerts />
+    <WeekStrip />
     <section class="panel today-c">
-      <p class="eyebrow">Oggi</p>
+      <div class="pill-row"><p class="eyebrow">{started && slot ? `Oggi · ${weekLabel(slot)}` : 'Oggi'}</p>{tone && <span class={'pill ' + tone.key}>{tone.label}</span>}</div>
       {!started && <><h2>Si parte il {fmtDate(first.monday, { day: 'numeric', month: 'long' })}</h2><a class="btn ghost" href="#/piano">Guarda il piano</a></>}
-      {started && ses && <><h2>{ses.text}</h2>{blocks && blocks.length > 1 && <BlockList blocks={blocks} compact />}
+      {started && ses && <><h2>{ses.text}</h2>{blocks && <BlockList blocks={blocks} compact />}
         {done ? <div class="done"><strong>Registrato</strong><span>Bel lavoro</span></div> : blocks ? <a class="btn" href={`#/guida?key=${key}&date=${today}`}>Inizia l'allenamento</a> : <a class="btn ghost" href="#/oggi">Apri la seduta</a>}</>}
       {started && slot && !ses && <><h2>{force ? 'Oggi forza' : 'Oggi niente corsa'}</h2><p>{force ? STRENGTH[String(slot.phase)] ?? STRENGTH['1'] : 'Recupera: il corpo migliora anche a riposo.'}</p>
         {force ? gym ? <div class="done"><strong>Registrato</strong><span>Bel lavoro</span></div> : <a class="btn" href={`#/forza?date=${today}`}>Inizia la forza</a> : <a class="btn ghost" href="#/routine?id=mobility">Mobilità del giorno di riposo</a>}</>}
@@ -64,10 +78,10 @@ export function Home() {
     <WeatherCard />
     <PlanTip />
     <nav class="tiles" aria-label="Sezioni">
-      <a href="#/oggi"><Ic d={ICON.run} /><b>Allenati</b><small>Seduta del giorno, forza, routine e i tuoi allenamenti</small></a>
-      <a href="#/consulta"><Ic d={ICON.chart} /><b>Consulta</b><small>Piano, andamento, test e storico</small></a>
-      <a href="#/impara"><Ic d={ICON.book} /><b>Impara</b><small>Allenamenti, esercizi, abbigliamento, alimentazione e gara</small></a>
-      <a href="#/impostazioni"><Ic d={ICON.user} /><b>Profilo</b><small>Il tuo piano, orologio, zone e dati</small></a>
+      <a href="#/oggi"><span class="tile-i t-blue"><Ic d={ICON.run} /></span><b>Allenati</b></a>
+      <a href="#/consulta"><span class="tile-i t-green"><Ic d={ICON.chart} /></span><b>Consulta</b></a>
+      <a href="#/impara"><span class="tile-i t-violet"><Ic d={ICON.book} /></span><b>Impara</b></a>
+      <a href="#/impostazioni"><span class="tile-i t-grey"><Ic d={ICON.user} /></span><b>Profilo</b></a>
     </nav>
     <a class="btn ghost" href="#/aiuto">Guida</a>
     <a class="version" href="#/novita" aria-label={`Versione ${APP_VERSION}: guarda le novità`}>Versione {APP_VERSION} · Novità</a>

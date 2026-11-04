@@ -6,6 +6,22 @@ Numerazione: il numero centrale cresce quando cambia una funzione, l'ultimo quan
 
 Le sezioni ammesse in ogni versione sono Aggiunto, Modificato e Tolto.
 
+## 1.16.0 - 2026-11-05
+
+### Aggiunto
+
+- Striscia della settimana in Home, con un pallino colorato per ogni giorno.
+- Etichetta dello sforzo sulla seduta: Facile, Medio o Forte.
+- Legenda sotto il profilo della seduta.
+
+### Modificato
+
+- Nuovo stile in tema chiaro e scuro: sfondo azzurro-grigio, titoli più marcati e tinte leggere per ogni sezione.
+- Il colore del profilo indica lo sforzo e la larghezza rispetta la durata reale di corsa e recupero.
+- La seduta del giorno è più ordinata, con fiato e fatica in due riquadri.
+- Impara è divisa in Correre, Il corpo, Intorno alla corsa e Il giorno X.
+- Nelle schede i passi sono numerati e gli errori da evitare sono evidenziati.
+
 ## 1.15.0 - 2026-11-04
 
 ### Aggiunto

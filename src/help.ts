@@ -1,5 +1,5 @@
 /* Guida dell'app. Regola: ogni nuova funzione si descrive qui nello stesso aggiornamento, e si cambia GUIDE_DATE. */
-export const GUIDE_DATE = '4 novembre 2026'
+export const GUIDE_DATE = '5 novembre 2026'
 export interface HelpItem { q: string; a: string[]; to?: [string, string] }
 export interface HelpSection { id: string; title: string; items: HelpItem[] }
 export const HELP: HelpSection[] = [
@@ -10,6 +10,7 @@ export const HELP: HelpSection[] = [
     { q: 'Come scelgo il percorso', a: ['Al primo accesso, se sei una persona nuova, o quando fermi il piano, indichi da dove parti e il tuo obiettivo: dal 5 km alla maratona, trail, una distanza a scelta o semplicemente stare in forma. Il piano si costruisce su di te.', 'In alternativa puoi scegliere la Maratona graduale, un percorso pronto di 50 settimane, oppure scrivere la tua tabella. Se cambi percorso, gli allenamenti registrati restano.'], to: ['mio-piano', 'Apri Il mio piano'] },
   ] },
   { id: 'home', title: 'Home', items: [
+    { q: 'La settimana e i colori', a: ['In alto vedi i sette giorni: il pallino verde acqua è una seduta facile, ambra media, corallo forte, viola la forza, grigio un giorno libero. Lo stesso colore si ritrova nell\'etichetta della seduta e nel suo profilo, dove l\'altezza indica lo sforzo e la larghezza la durata.'] },
     { q: 'Cosa mostra', a: ['La seduta di oggi, con un pulsante per partire subito, e gli avvisi sul corpo se hai segnalato dolori o un blocco.', 'Se la seduta ha più blocchi, vedi anche il suo schema: la larghezza indica la durata stimata e l\'altezza l\'intensità.'] },
     { q: 'Meteo e come vestirti', a: ['La Home mostra oggi e domani all\'ora in cui corri: temperatura, percepita, vento, pioggia, buio e l\'andamento della giornata. Tocca un giorno per vedere i suoi consigli.', 'I consigli dipendono dalla seduta: per un lungo lento ti copri di più che per le ripetute. Indicano cosa indossare, cosa portare e quando spostare l\'allenamento, per esempio con un temporale. Nei giorni di riposo, forza o nuoto vedi solo il meteo.', 'Località e ore si scelgono in Profilo. Senza rete vedi l\'ultima previsione salvata.'], to: ['impostazioni', 'Apri Profilo'] },
     { q: 'La domanda del mattino', a: ['Il giorno dopo una corsa l\'app chiede se hai gonfiore. La risposta serve alle regole di sicurezza del piano.'] },

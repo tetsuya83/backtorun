@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import plan from '../shared/plan.json'
-import { advance, blocksError, blocksKm, blocksOf, blocksText, finishStep, guideProgress, guideSteps, parseBlocks, startGuide, TEMPLATES, timedAhead, type Block } from '../shared/blocks'
+import { advance, blocksError, blocksKm, blocksOf, blocksText, finishStep, guideProgress, guideSteps, parseBlocks, startGuide, TEMPLATES, timedAhead, type Block, sessionTone } from '../shared/blocks'
 import { addFix, meters, newTrack } from '../shared/gps'
 import { painsOf, painText, withPains, worstOf, zoneCounts } from '../shared/pain'
 import { parseGpx, parseTcx, parseXmlTrack } from '../shared/track'
@@ -206,5 +206,13 @@ describe('fermare il piano', () => {
   })
   it('una seconda ripartenza ha chiavi ancora diverse', () => {
     mk({ round: 1 }); restartPlan(); switchPlan('base'); expect(buildTimeline(P, data.value!.state).slots[0].key).toBe('r2.w1.0')
+  })
+})
+
+describe('sforzo della seduta', () => {
+  it('conta il tratto più impegnativo e ignora i riposi', () => {
+    expect(sessionTone({ text: "6×[1' corsa + 2' cammino]", km: null })?.key).toBe('easy')
+    expect(sessionTone({ text: "Interval: 5×[5' Z4 + 1' facile] (11 km)", km: 11 })?.key).toBe('hard')
+    expect(sessionTone({ text: "Riposo o 20' facili", km: 0 })).toBeNull()
   })
 })

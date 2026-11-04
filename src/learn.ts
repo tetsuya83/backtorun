@@ -53,6 +53,13 @@ export const ARTICLES: Article[] = [
   ...LIFE,
 ]
 export const GROUPS: [Article['group'], string, string][] = [['base', 'Le basi', 'Come regolare lo sforzo'], ['corsa', 'Tipi di allenamento', 'Cosa sono e a cosa servono'], ['forza', 'Esercizi di forza', 'Come si eseguono'], ['mobilita', 'Mobilità', 'Movimenti e allungamenti'], ...LIFE_GROUPS]
+/** L'elenco di Impara, diviso per argomento: l'ordine è quello delle sezioni. */
+export const SECTIONS: { title: string; tone: string; groups: Article['group'][] }[] = [
+  { title: 'Correre', tone: 'run', groups: ['base', 'corsa'] },
+  { title: 'Il corpo', tone: 'body', groups: ['forza', 'mobilita', 'salute'] },
+  { title: 'Intorno alla corsa', tone: 'around', groups: ['vesti', 'cibo', 'integra'] },
+  { title: 'Il giorno X', tone: 'race', groups: ['gara'] },
+]
 export const articleById = (id?: string | null) => ARTICLES.find(a => a.id === id)
 /** La scheda da aprire partendo dal testo di una seduta. */
 export function learnFor(text: string) {

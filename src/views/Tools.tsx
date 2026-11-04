@@ -63,7 +63,7 @@ export function PlanTip() {
   const a = tip && articleById(tip.to)
   if (!tip || !a) return null
   const hide = () => { const l = [...hid, tip.key]; setHid(l); try { localStorage.setItem(KEY, JSON.stringify(l)) } catch { /* resta nascosto fino alla prossima apertura */ } }
-  return <section class="panel" aria-label="Consiglio del momento">
+  return <section class="panel warn" aria-label="Consiglio del momento">
     <p class="eyebrow">Da sapere ora</p>
     <h2>{tip.title}</h2>
     <p>{tip.text}</p>
