@@ -192,3 +192,19 @@ describe('scelta del percorso', () => {
     expect(mustChoose({ state: { mode: 'custom' }, me: { isAdmin: false } })).toBe(false)
   })
 })
+import { restartPlan, switchPlan } from '../src/api'
+describe('fermare il piano', () => {
+  const mk = (x = {}) => { data.value = { plan: P, state: { ...defaultState, mode: 'base', skips: [3], repeats: [2], startWeek: 6, hrMax: 180, watch: 'Garmin', planned: [{ id: 'q' } as any], ...x }, activities: [{ id: 'a', date: '2026-11-10', type: 'corsa', source: 'manuale', sessionKey: 'w6.0-mar' }], tests: [], workouts: [{ id: 'w' } as any], me: { name: 'x', isAdmin: true } } }
+  it('chiede una nuova scelta a chiunque, anche all\'amministratore, e non perde i dati', () => {
+    mk(); restartPlan(); const d = data.value!
+    expect(mustChoose(d)).toBe(true); expect(d.activities.length).toBe(1); expect(d.workouts!.length).toBe(1); expect(d.state.planned).toEqual([])
+  })
+  it('riparte dall\'inizio tenendo le impostazioni, e le vecchie sedute non risultano fatte', () => {
+    mk(); restartPlan(); switchPlan('base'); const s = data.value!.state
+    expect(mustChoose(data.value!)).toBe(false); expect(s.startWeek).toBe(1); expect(s.skips).toEqual([]); expect(s.repeats).toEqual([]); expect(s.hrMax).toBe(180); expect(s.watch).toBe('Garmin')
+    const t = buildTimeline(P, s); expect(t.slots[0].week).toBe(1); expect(t.slots[0].key).toBe('r1.w1.0')
+  })
+  it('una seconda ripartenza ha chiavi ancora diverse', () => {
+    mk({ round: 1 }); restartPlan(); switchPlan('base'); expect(buildTimeline(P, data.value!.state).slots[0].key).toBe('r2.w1.0')
+  })
+})

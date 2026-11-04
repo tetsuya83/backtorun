@@ -2,6 +2,7 @@ import { hrMaxOf, observedMax, validHr, zonesFrom } from '../../shared/analysis'
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { call, clearLocal, data, load, saveCustomPlan, saveState } from '../api'
 import { Field, Note } from '../ui'
+import { RestartButton } from './MyPlan'
 import { isCustom, moveRace, planFor, type Activity } from '../../shared/engine'
 import { painText, watchedZones, ZONES } from '../../shared/pain'
 
@@ -70,6 +71,7 @@ export function Settings({ onLogout }: { onLogout: () => void }) {
       <section class="head"><h1>Profilo</h1></section>
       <h2 class="phase">Piano</h2>
       <a class="btn ghost" href="#/mio-piano">{custom ? d.custom!.meta.name : 'Maratona graduale'}: cambia percorso</a>
+      <RestartButton />
       <h2 class="phase">Calendario</h2>
       <Field label="Inizio del piano"><input type="date" value={st.startDate} onChange={e => saveState({ ...st, startDate: e.currentTarget.value })} /></Field>
       {!custom && <Field label="Settimana di partenza"><input type="number" min={1} max={34} value={st.startWeek} onChange={e => saveState({ ...st, startWeek: Math.min(34, Math.max(1, +e.currentTarget.value || 1)) })} /></Field>}

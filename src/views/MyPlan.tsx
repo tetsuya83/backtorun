@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'preact/hooks'
-import { data, saveCustomPlan, saveState, startCustomPlan, uid, switchPlan } from '../api'
+import { data, restartPlan, saveCustomPlan, saveState, startCustomPlan, uid, switchPlan } from '../api'
 import { addDays, DAYS, mondayOf, mustChoose, planError, type Day, type Plan, type Session, type Week } from '../../shared/engine'
 import { blankPlan, generatePlan, MAX_KM, MIN_KM, RACES, type GoalInput, type RaceType } from '../../shared/generator'
 import { fmtDate, todayISO, WEEKDAY } from '../guide'
@@ -18,6 +18,9 @@ export function DayPicker({ label, value, onChange, disabled = [] }: { label: st
   </div></fieldset>
 }
 
+export function RestartButton() {
+  return <button type="button" class="btn ghost danger" onClick={() => { if (confirm('Vuoi fermare il piano e ricominciare da una nuova scelta? Il calendario riparte da zero. Allenamenti registrati e salvati restano.')) { restartPlan(); nav('mio-piano') } }}>Ferma il piano e ricomincia</button>
+}
 /** Il percorso: si sceglie al primo accesso e si può cambiare quando si vuole. */
 export function MyPlan() {
   const d = data.value!, mode = d.state.mode === 'custom' && d.custom ? 'custom' : 'base', first = mustChoose(d)
@@ -25,7 +28,7 @@ export function MyPlan() {
   const replace = (e: Event) => { if (d.custom && !confirm('Il nuovo piano sostituirà quello attuale. Gli allenamenti registrati restano.')) e.preventDefault() }
   return (
     <div class="stack">
-      <section class="head"><h1>{first ? 'Scegli il tuo percorso' : 'Il tuo percorso'}</h1><p>{first ? 'Dicci da dove parti e dove vuoi arrivare: il piano si costruisce su di te.' : 'Puoi cambiare quando vuoi: gli allenamenti registrati restano.'}</p></section>
+      <section class="head"><h1>{first ? 'Scegli il tuo percorso' : 'Il tuo percorso'}</h1><p>{d.state.restart ? 'Scegli come ripartire. Gli allenamenti già registrati restano.' : first ? 'Dicci da dove parti e dove vuoi arrivare: il piano si costruisce su di te.' : 'Puoi cambiare quando vuoi: gli allenamenti registrati restano.'}</p></section>
       <section class="panel choice">
         <h2>Crea il tuo percorso</h2>
         <p>Scegli da dove parti e il tuo obiettivo, dal 5 km alla maratona, oppure semplicemente stare in forma.</p>
@@ -51,6 +54,7 @@ export function MyPlan() {
         <p>Hai già una tabella tua o del tuo allenatore? Inseriscila settimana per settimana.</p>
         <a class="btn ghost" href="#/mio-piano/tabella" onClick={replace}>Parti da una tabella vuota</a>
       </section>
+      {!first && <RestartButton />}
     </div>
   )
 }

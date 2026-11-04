@@ -11,7 +11,7 @@ export interface Planned extends Omit<Workout, 'updatedAt'> { date: string; mode
 export interface Week { week: number | string; phase: number; scarico: boolean; skippable: boolean; total: number | null; sessions: Session[]; uid?: string }
 export interface PlanMeta { phases: Record<string, string>; kind?: 'custom'; id?: string; name?: string; strengthDays?: Day[] }
 export interface Plan { meta: PlanMeta; weeks: Week[]; maintenance: Week[] }
-export interface State { startDate: string; startWeek: number; skips: number[]; repeats: number[]; raceDate: string | null; raceName?: string | null; mode?: 'base' | 'custom'; hrMax?: number | null; watch?: string | null; zones?: string[] | null; planned?: Planned[]; other?: Partial<State> | null }
+export interface State { startDate: string; startWeek: number; skips: number[]; repeats: number[]; raceDate: string | null; raceName?: string | null; mode?: 'base' | 'custom'; hrMax?: number | null; watch?: string | null; zones?: string[] | null; planned?: Planned[]; restart?: boolean; round?: number; other?: Partial<State> | null }
 export interface Activity {
   id: string; date: string; type: 'corsa' | 'forza' | 'nuoto' | 'bici' | 'altro'; sessionKey?: string | null; source: 'manuale' | 'fit' | 'gpx' | 'tcx' | 'gps'
   km?: number | null; seconds?: number | null; hrAvg?: number | null; hrMax?: number | null; hrLast?: number | null
@@ -43,7 +43,9 @@ export interface Timeline { slots: Slot[]; raceTooClose: boolean; earliestRace: 
 
 /** Calcola il calendario dal piano e dallo stato: salti e ripetizioni spostano tutto, la Fase 4 si aggancia alla gara. */
 export function buildTimeline(plan: Plan, st: State): Timeline {
-  const t = baseTimeline(plan, st), swaps = (st.planned ?? []).filter(p => p.mode === 'replace')
+  const raw = baseTimeline(plan, st)
+  // ogni ripartenza ha chiavi nuove: gli allenamenti del giro precedente non segnano come fatte le nuove sedute
+  const t = st.round ? { ...raw, slots: raw.slots.map(s => ({ ...s, key: `r${st.round}.${s.key}` })) } : raw, swaps = (st.planned ?? []).filter(p => p.mode === 'replace')
   if (!swaps.length) return t
   return { ...t, slots: t.slots.map(s => {
     const here = swaps.filter(p => p.date >= s.monday && p.date < addDays(s.monday, 7))
@@ -60,8 +62,8 @@ export function buildTimeline(plan: Plan, st: State): Timeline {
 }
 export const plannedOn = (st: State, date: string) => (st.planned ?? []).filter(p => p.date === date && p.mode === 'add')
 export const plannedKey = (p: { id: string }) => `p-${p.id}`
-/** La scelta del percorso si chiede solo a chi non ne ha una: l'amministratore esistente resta sul suo piano. */
-export const mustChoose = (d: { state: { mode?: string | null }; me?: { isAdmin: boolean } }) => !d.state.mode && !d.me?.isAdmin
+/** La scelta si chiede a chi non ha un percorso o ha fermato il piano: l'amministratore esistente resta sul suo. */
+export const mustChoose = (d: { state: { mode?: string | null; restart?: boolean }; me?: { isAdmin: boolean } }) => !!d.state.restart || (!d.state.mode && !d.me?.isAdmin)
 export const MAX_WORKOUTS = 100
 /** Restituisce il problema dell'allenamento, oppure null se va bene. */
 export function workoutError(w: any): string | null {
