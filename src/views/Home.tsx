@@ -7,6 +7,7 @@ import { BlockList, Note } from '../ui'
 import { History } from './Log'
 import { PlannedToday } from './Workouts'
 import { WeatherCard } from './Weather'
+import { APP_VERSION } from '../changelog'
 
 /** Avvisi sul corpo: stanno in Home e in Allenati perché non devono sfuggire. */
 export function BodyAlerts() {
@@ -67,6 +68,7 @@ export function Home() {
       <a href="#/impostazioni"><Ic d={ICON.user} /><b>Profilo</b><small>Il tuo piano, orologio, zone e dati</small></a>
     </nav>
     <a class="btn ghost" href="#/aiuto">Guida</a>
+    <a class="version" href="#/novita" aria-label={`Versione ${APP_VERSION}: guarda le novità`}>Versione {APP_VERSION} · Novità</a>
   </div>
 }
 export function Consult() {

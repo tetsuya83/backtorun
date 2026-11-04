@@ -52,7 +52,8 @@ export const HELP: HelpSection[] = [
     { q: 'Sono senza rete', a: ['Puoi continuare a usare l\'app. Quello che salvi resta in attesa e si sincronizza da solo quando torna la connessione. In alto vedi quanti dati sono in attesa.', 'Il primo avvio richiede la rete.'] },
     { q: 'Il GPS non parte o è debole', a: ['Controlla il permesso di posizione del browser e aspetta GPS pronto all\'aperto, lontano da edifici alti. Se non funziona, passa all\'orologio.'] },
     { q: 'Non sento suoni o voce', a: ['Controlla il volume e il silenzioso del telefono. Tieni lo schermo acceso con l\'app aperta.'] },
-    { q: 'Non vedo l\'ultima versione', a: ['Chiudi e riapri l\'app. Se l\'icona resta vecchia, rimuovi l\'app e installala di nuovo: i dati stanno sul server e restano.'] },
+    { q: 'Cosa è cambiato nell\'app', a: ['In fondo alla Home trovi il numero di versione: toccalo per aprire Novità, con tutte le versioni e cosa è stato aggiunto, modificato o tolto in ciascuna.'], to: ['novita', 'Apri Novità'] },
+    { q: 'Non vedo l\'ultima versione', a: ['Il numero in fondo alla Home ti dice quale versione stai usando. Chiudi e riapri l\'app. Se l\'icona resta vecchia, rimuovi l\'app e installala di nuovo: i dati stanno sul server e restano.'] },
     { q: 'Ho dimenticato la password', a: ['Chiedi all\'amministratore un link per crearne una nuova.'] },
   ] },
 ]
