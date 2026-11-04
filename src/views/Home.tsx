@@ -62,6 +62,7 @@ export function Home() {
       <a href="#/impara"><Ic d={ICON.book} /><b>Impara</b><small>Tipi di allenamento, esercizi e perché farli</small></a>
       <a href="#/impostazioni"><Ic d={ICON.user} /><b>Profilo</b><small>Il tuo piano, orologio, zone e dati</small></a>
     </nav>
+    <a class="btn ghost" href="#/aiuto">Guida</a>
   </div>
 }
 export function Consult() {

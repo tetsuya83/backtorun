@@ -126,3 +126,11 @@ describe('importazione GPX e TCX', () => {
   })
   it('riconosce il formato dal contenuto', () => { expect(parseXmlTrack(gpx).source).toBe('gpx'); expect(parseXmlTrack(tcx).source).toBe('tcx'); expect(() => parseXmlTrack('<a/>')).toThrow(/FIT, GPX o TCX/) })
 })
+import { HELP, GUIDE_DATE } from '../src/help'
+describe('guida', () => {
+  it('copre tutte le sezioni, senza voci vuote', () => {
+    expect(GUIDE_DATE).toBeTruthy()
+    expect(HELP.map(s => s.id)).toEqual(expect.arrayContaining(['home', 'allenati', 'registra', 'consulta', 'impara', 'profilo', 'problemi']))
+    for (const s of HELP) for (const i of s.items) expect(i.a.length, i.q).toBeGreaterThan(0)
+  })
+})

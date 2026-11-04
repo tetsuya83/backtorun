@@ -36,6 +36,10 @@ In **Impostazioni** puoi scaricare un backup JSON e un CSV. Fai un backup al mes
 
 100.000 richieste API al giorno, 5 milioni di righe lette e 100.000 scritte al giorno, 5 GB di spazio. Per una persona sono ampiamente sufficienti.
 
+## Guida dell'app
+
+La guida si trova in `src/help.ts`: ogni nuova funzione va descritta lì nello stesso aggiornamento.
+
 ## Sviluppo locale
 
     npm install

@@ -16,12 +16,13 @@ import { RoutineView, TimerView } from './views/Timer'
 import { BlankPlan, EditPlan, MyPlan, NewPlan } from './views/MyPlan'
 import { Consult, Home } from './views/Home'
 import { Learn } from './views/Learn'
+import { Help } from './views/Help'
 import { FREE, GuideView } from './views/Guide'
 import { Builder } from './views/Builder'
 import { local } from './sound'
 
 const TABS = [
-  ['home', 'Home', 'M4 11l8-7 8 7v9h-5v-6H9v6H4z', ['home']],
+  ['home', 'Home', 'M4 11l8-7 8 7v9h-5v-6H9v6H4z', ['home', 'aiuto']],
   ['oggi', 'Allenati', 'M4 13h6l2-7 4 13 2-6h2', ['oggi', 'guida', 'registra', 'forza', 'timer', 'routine', 'costruisci']],
   ['consulta', 'Consulta', 'M5 19v-6M12 19V6M19 19v-9', ['consulta', 'piano', 'andamento', 'test', 'corsa', 'mio-piano']],
   ['impara', 'Impara', 'M4 5h7a2 2 0 0 1 2 2v13a2 2 0 0 0-2-2H4zM20 5h-5a2 2 0 0 0-2 2v13a2 2 0 0 1 2-2h5z', ['impara']],
@@ -66,6 +67,7 @@ function App() {
       <main>
         {base === 'home' && <Home />}
         {base === 'consulta' && <Consult />}
+        {base === 'aiuto' && <Help />}
         {base.split('/')[0] === 'impara' && <Learn route={base} />}
         {base === 'guida' && <GuideView key={route} route={route} />}
         {base === 'costruisci' && <FreeBuilder />}
