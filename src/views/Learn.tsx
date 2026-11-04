@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks'
+import { useEffect, useState } from 'preact/hooks'
 import { Illustration } from '../art'
 import { articleById, ARTICLES, GROUPS, type Article } from '../learn'
 import { Note } from '../ui'
@@ -19,13 +19,24 @@ function Sheet({ a }: { a: Article }) {
 }
 export function Learn({ route }: { route: string }) {
   const id = route.split('?')[0].split('/')[1], a = articleById(id)
-  const [q, setQ] = useState('')
+  const [q, setQ] = useState(''), [open, setOpen] = useState<Article['group'][]>([]), group = a?.group
+  // Chi arriva a una scheda da fuori, tornando all'elenco, ritrova aperta la sua categoria.
+  useEffect(() => { if (group) setOpen(o => o.includes(group) ? o : [...o, group]) }, [group])
   if (a) return <Sheet key={a.id} a={a} />
   const low = q.trim().toLowerCase(), hit = (x: Article) => !low || `${x.title} ${x.short}`.toLowerCase().includes(low)
   return <div class="stack form">
     <section class="head"><h1>Impara</h1><p>Cosa sono gli allenamenti, a cosa servono e come si eseguono.</p></section>
     <input type="search" aria-label="Cerca una scheda" placeholder="Cerca, per esempio polpacci" value={q} onInput={e => setQ(e.currentTarget.value)} />
-    {GROUPS.map(([g, title, sub]) => { const l = ARTICLES.filter(x => x.group === g && hit(x)); return l.length ? <section key={g}><h2 class="phase">{title}</h2><p class="sub pad">{sub}</p><ul class="cards">{l.map(x => <li key={x.id}><a href={`#/impara/${x.id}`}>{x.anim && <Illustration id={x.anim} thumb />}<span><b>{x.title}</b><small>{x.short}</small></span></a></li>)}</ul></section> : null })}
+    <div class="topics">{GROUPS.map(([g, title, sub]) => {
+      const l = ARTICLES.filter(x => x.group === g && hit(x)), shown = !!low || open.includes(g)
+      if (!l.length) return null
+      return <section key={g} class={shown ? 'topic open' : 'topic'}>
+        <button type="button" class="topic-head" aria-expanded={shown} aria-controls={`impara-${g}`} disabled={!!low} onClick={() => setOpen(o => o.includes(g) ? o.filter(x => x !== g) : [...o, g])}>
+          <span><b>{title}</b><small>{sub}</small></span><em>{l.length}</em>
+        </button>
+        {shown && <ul class="cards" id={`impara-${g}`}>{l.map(x => <li key={x.id}><a href={`#/impara/${x.id}`}>{x.anim && <Illustration id={x.anim} thumb />}<span><b>{x.title}</b><small>{x.short}</small></span></a></li>)}</ul>}
+      </section>
+    })}</div>
     {!ARTICLES.some(hit) && <p class="sub pad">Nessuna scheda trovata.</p>}
   </div>
 }

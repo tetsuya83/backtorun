@@ -37,7 +37,7 @@ export const HELP: HelpSection[] = [
     { q: 'Creare o modificare un piano', a: ['Per creare un percorso indichi da dove parti, obiettivo, data se c\'è una gara e giorni disponibili. L\'app avvisa se la data è troppo vicina.', 'In un piano personale puoi modificare ogni seduta con il wizard o scriverla a mano, duplicare le settimane e copiarle in quelle vuote.'], to: ['mio-piano', 'Apri Il mio piano'] },
   ] },
   { id: 'impara', title: 'Impara', items: [
-    { q: 'Cosa trovi', a: ['Schede su tipi di allenamento, esercizi di forza e mobilità: a cosa servono, quando farli, come si eseguono ed errori comuni. Molte hanno un\'illustrazione e le fonti.', 'Puoi cercare per nome. Le illustrazioni funzionano anche offline: negli esercizi vedi la posizione iniziale e quella finale.'], to: ['impara', 'Apri Impara'] },
+    { q: 'Cosa trovi', a: ['Schede su tipi di allenamento, esercizi di forza e mobilità: a cosa servono, quando farli, come si eseguono ed errori comuni. Molte hanno un\'illustrazione e le fonti.', 'All\'inizio vedi solo le categorie: toccane una per aprirla e vedere le schede, toccala di nuovo per chiuderla. Se cerchi per nome, compaiono subito le schede trovate. Le illustrazioni funzionano anche offline: negli esercizi vedi la posizione iniziale e quella finale.'], to: ['impara', 'Apri Impara'] },
   ] },
   { id: 'profilo', title: 'Profilo', items: [
     { q: 'Fermare il piano e ricominciare', a: ['In Profilo o in Il tuo percorso tocca Ferma il piano e ricomincia, poi scegli di nuovo percorso e obiettivo. Puoi farlo in qualsiasi momento.', 'Il calendario riparte da zero e gli allenamenti inseriti nel piano si tolgono. Allenamenti registrati, allenamenti salvati e impostazioni restano.'], to: ['impostazioni', 'Apri Profilo'] },
