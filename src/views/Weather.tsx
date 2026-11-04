@@ -26,7 +26,7 @@ export function outing(d: Data, date: string) {
   return plannedOn(st, date).find(p => p.sport === 'corsa') ?? null
 }
 /** Oggi conta l'ora abituale finché non è passata, poi l'ora attuale. */
-function dayHour(p: WeatherPrefs, date: string, today: string) {
+export function dayHour(p: WeatherPrefs, date: string, today: string) {
   const usual = runHour(p, date), now = new Date().getHours()
   return date === today && now > usual ? now : usual
 }

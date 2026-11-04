@@ -1,6 +1,7 @@
 /* Sezione Impara: contenuti scritti a mano e illustrazioni nostre, disponibili anche senza rete. */
+import { LIFE, LIFE_GROUPS } from './learn-life'
 export interface Source { title: string; url: string }
-export interface Article { id: string; group: 'corsa' | 'forza' | 'mobilita' | 'base'; title: string; short: string; anim?: string; what: string; why: string[]; when: string; how: string[]; errors: string[]; care?: string; sources?: Source[] }
+export interface Article { id: string; group: 'corsa' | 'forza' | 'mobilita' | 'base' | 'vesti' | 'cibo' | 'integra' | 'salute' | 'gara'; tool?: 'wear' | 'fuel'; level?: string; title: string; short: string; anim?: string; what: string; why: string[]; when: string; how: string[]; errors: string[]; care?: string; sources?: Source[] }
 const S: Record<string, Source> = {
   dist: { title: 'Stöggl e Sperlich, distribuzione dell\'intensità negli atleti di resistenza, Frontiers in Physiology 2015', url: 'https://opus.bibliothek.uni-wuerzburg.de/frontdoor/index/index/docId/13888' },
   talk: { title: 'Condello e colleghi, stimare le soglie con metodi semplici, Journal of Sports Science and Medicine 2014', url: 'https://jssm.org/13-2-309.p_d_f' },
@@ -49,8 +50,9 @@ export const ARTICLES: Article[] = [
   mob('slanci', 'Slanci', 'swing', 'Scioglie le anche prima di correre', 'Con una mano al muro, slanci una gamba avanti e indietro.', ['Gamba morbida', 'Movimento controllato', 'Aumenta l\'ampiezza poco alla volta'], ['Strappi', 'Oscillare il busto'], 'Nel riscaldamento.'),
   mob('gluteo', 'Gluteo a terra', 'glute', 'Allunga il gluteo', 'Sdraiato, appoggi una caviglia sul ginocchio opposto e avvicini le gambe.', ['Testa e spalle rilassate', 'Avvicina piano le gambe'], ['Tirare fino a sentire dolore']),
   mob('gatto', 'Gatto e cammello', 'cat', 'Scioglie la schiena', 'A quattro zampe, alterni schiena arrotondata e schiena incavata.', ['Lento, seguendo il respiro', 'Muovi una vertebra alla volta'], ['Fare il movimento di fretta']),
+  ...LIFE,
 ]
-export const GROUPS: [Article['group'], string, string][] = [['base', 'Le basi', 'Come regolare lo sforzo'], ['corsa', 'Tipi di allenamento', 'Cosa sono e a cosa servono'], ['forza', 'Esercizi di forza', 'Come si eseguono'], ['mobilita', 'Mobilità', 'Movimenti e allungamenti']]
+export const GROUPS: [Article['group'], string, string][] = [['base', 'Le basi', 'Come regolare lo sforzo'], ['corsa', 'Tipi di allenamento', 'Cosa sono e a cosa servono'], ['forza', 'Esercizi di forza', 'Come si eseguono'], ['mobilita', 'Mobilità', 'Movimenti e allungamenti'], ...LIFE_GROUPS]
 export const articleById = (id?: string | null) => ARTICLES.find(a => a.id === id)
 /** La scheda da aprire partendo dal testo di una seduta. */
 export function learnFor(text: string) {

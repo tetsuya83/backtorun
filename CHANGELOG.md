@@ -2,18 +2,21 @@
 
 Ogni versione pubblicata di BackToRun, dalla più recente alla prima. L'app legge questo file e lo mostra nella pagina Novità.
 
-Numerazione: il numero centrale cresce quando cambia una funzione, l'ultimo quando si corregge un errore. Le pubblicazioni solo tecniche, senza effetti per chi usa l'app, non creano una versione.
+Numerazione: il numero centrale cresce quando cambia una funzione, l'ultimo quando si corregge un errore. Le pubblicazioni ravvicinate possono essere unite in un'unica versione, perciò i numeri possono saltare. Le pubblicazioni solo tecniche, senza effetti per chi usa l'app, non creano una versione.
 
 Le sezioni ammesse in ogni versione sono Aggiunto, Modificato e Tolto.
 
-## 1.14.0 - 2026-11-04
+## 1.15.0 - 2026-11-04
 
 ### Aggiunto
 
+- Impara si amplia con cinque categorie: Abbigliamento, Alimentazione, Integrazione, Recupero e salute, Gara.
+- Cosa mi metto oggi: consigli su come vestirsi partendo dal meteo o da dati scritti a mano.
+- Calcolatore per il lungo con carboidrati, gel e liquidi.
+- Consigli al momento giusto in Home, legati ai prossimi giorni del piano.
+- Collegamento al calcolatore dalle sedute di almeno un'ora.
 - Pagina Novità con tutte le versioni pubblicate e cosa è stato aggiunto, modificato o tolto in ciascuna.
 - Link discreto con il numero di versione in fondo alla Home.
-
-## 1.13.0 - 2026-11-04
 
 ### Modificato
 

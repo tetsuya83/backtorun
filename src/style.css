@@ -104,3 +104,4 @@ input:focus,select:focus,textarea:focus{outline:0;border-color:var(--accent);box
 .topic.open .topic-head:disabled em::after{content:none}
 .version{align-self:center;padding:10px 12px;color:var(--muted);font-size:13px;text-decoration:none}
 .news summary{font-weight:400}.news summary b{font-weight:600}.news summary small{flex:1;color:var(--muted);font-size:13px;text-align:right}.news section{padding-bottom:14px}.news h3{font-size:14px;font-weight:600;color:var(--muted);margin:0 0 6px}.news ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
+.level{align-self:flex-start;padding:4px 10px;border-radius:999px;background:var(--track);color:var(--text);font-size:13px;font-weight:600}.head .level{color:var(--text)}

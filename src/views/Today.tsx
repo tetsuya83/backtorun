@@ -4,6 +4,7 @@ import { fmtDate, MONTHS, STRENGTH, STRENGTH_LIST, todayISO } from '../guide'
 import { BlockList, Gauge, Note } from '../ui'
 import { blocksOf } from '../../shared/blocks'
 import { learnFor } from '../learn'
+import { sessionMin } from '../../shared/tips'
 import { BodyAlerts } from './Home'
 import { PlannedToday } from './Workouts'
 import { paceOf, timeOf } from '../fit'
@@ -37,6 +38,7 @@ function SessionHero({ s, date, done, label }: { s: Slot; date: string; done?: A
       {done?.trace?.length ? <a class="btn ghost" href={`#/corsa?id=${done.id}`}>Dettaglio corsa</a> : null}
       {done && <a class="btn ghost" href={`#/routine?id=${cool.id}`}>{cool.name}, {mins(cool)}</a>}
       {art && <a href={`#/impara/${art.id}`}>Cos'è e a cosa serve: {art.title.toLowerCase()}</a>}
+      {sessionMin(ses) >= 60 && <a href="#/impara/calcolatore-lungo">Cosa portare da mangiare e bere</a>}
     </section>
   )
 }

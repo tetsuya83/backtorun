@@ -7,6 +7,7 @@ import { BlockList, Note } from '../ui'
 import { History } from './Log'
 import { PlannedToday } from './Workouts'
 import { WeatherCard } from './Weather'
+import { PlanTip } from './Tools'
 import { APP_VERSION } from '../changelog'
 
 /** Avvisi sul corpo: stanno in Home e in Allenati perché non devono sfuggire. */
@@ -61,10 +62,11 @@ export function Home() {
     </section>
     <PlannedToday />
     <WeatherCard />
+    <PlanTip />
     <nav class="tiles" aria-label="Sezioni">
       <a href="#/oggi"><Ic d={ICON.run} /><b>Allenati</b><small>Seduta del giorno, forza, routine e i tuoi allenamenti</small></a>
       <a href="#/consulta"><Ic d={ICON.chart} /><b>Consulta</b><small>Piano, andamento, test e storico</small></a>
-      <a href="#/impara"><Ic d={ICON.book} /><b>Impara</b><small>Tipi di allenamento, esercizi e perché farli</small></a>
+      <a href="#/impara"><Ic d={ICON.book} /><b>Impara</b><small>Allenamenti, esercizi, abbigliamento, alimentazione e gara</small></a>
       <a href="#/impostazioni"><Ic d={ICON.user} /><b>Profilo</b><small>Il tuo piano, orologio, zone e dati</small></a>
     </nav>
     <a class="btn ghost" href="#/aiuto">Guida</a>

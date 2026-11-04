@@ -90,5 +90,7 @@ export function advise(h: Hour, kind: RunKind, km?: number | null): Advice {
     : h.gust >= 70 ? 'Raffiche forti: evita viali alberati e zone esposte, o sposta la seduta.' : undefined
   return { wear, tips: tips.slice(0, 4), stop }
 }
+/** Il meteo scritto a mano in Cosa mi metto oggi, nella stessa forma delle previsioni. */
+export const manualHour = ({ feels, rain, wind, dark }: { feels: number; rain: boolean; wind: boolean; dark: boolean }): Hour => ({ t: '', temp: feels, feels, rainP: rain ? 80 : 0, rain: rain ? 1 : 0, wind: wind ? 30 : 5, gust: wind ? 45 : 10, code: rain ? 61 : 3, day: !dark })
 export const adviceTitle = (kind: RunKind) => ({ cammino: 'Corsa e cammino', facile: 'Corsa facile', lungo: 'Lungo lento', intenso: 'Seduta intensa' })[kind]
 export { low as lowerFirst }
