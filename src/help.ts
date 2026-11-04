@@ -11,6 +11,7 @@ export const HELP: HelpSection[] = [
   ] },
   { id: 'home', title: 'Home', items: [
     { q: 'Cosa mostra', a: ['La seduta di oggi, con un pulsante per partire subito, e gli avvisi sul corpo se hai segnalato dolori o un blocco.', 'Se la seduta ha più blocchi, vedi anche il suo schema: la larghezza indica la durata stimata e l\'altezza l\'intensità.'] },
+    { q: 'Meteo e come vestirti', a: ['La Home mostra oggi e domani all\'ora in cui corri: temperatura, percepita, vento, pioggia, buio e l\'andamento della giornata. Tocca un giorno per vedere i suoi consigli.', 'I consigli dipendono dalla seduta: per un lungo lento ti copri di più che per le ripetute. Indicano cosa indossare, cosa portare e quando spostare l\'allenamento, per esempio con un temporale. Nei giorni di riposo, forza o nuoto vedi solo il meteo.', 'Località e ore si scelgono in Profilo. Senza rete vedi l\'ultima previsione salvata.'], to: ['impostazioni', 'Apri Profilo'] },
     { q: 'La domanda del mattino', a: ['Il giorno dopo una corsa l\'app chiede se hai gonfiore. La risposta serve alle regole di sicurezza del piano.'] },
   ] },
   { id: 'allenati', title: 'Allenarsi', items: [
@@ -42,6 +43,7 @@ export const HELP: HelpSection[] = [
     { q: 'Fermare il piano e ricominciare', a: ['In Profilo o in Il tuo percorso tocca Ferma il piano e ricomincia, poi scegli di nuovo percorso e obiettivo. Puoi farlo in qualsiasi momento.', 'Il calendario riparte da zero e gli allenamenti inseriti nel piano si tolgono. Allenamenti registrati, allenamenti salvati e impostazioni restano.'], to: ['impostazioni', 'Apri Profilo'] },
     { q: 'Calendario e gara', a: ['Puoi cambiare inizio del piano, settimana di partenza, data e nome della gara. Nei piani personali, se sposti la gara si sposta tutto il calendario.'], to: ['impostazioni', 'Apri Profilo'] },
     { q: 'Zone da tenere d\'occhio', a: ['Scegli le parti del corpo che vuoi controllare a ogni corsa: compariranno da sole nella registrazione.'] },
+    { q: 'Meteo, località e ore', a: ['Cerca la tua località oppure attiva la posizione del telefono, utile in viaggio: se il permesso manca, l\'app usa la località scelta. Le coordinate, arrotondate a circa un chilometro, vanno solo al servizio Open-Meteo e non vengono salvate sul server.', 'Puoi indicare l\'ora della corsa e un\'ora diversa per la domenica.'] },
     { q: 'Frequenza cardiaca e orologio', a: ['Con la FC massima l\'app calcola le zone e mostra i battiti durante la guida. Il valore più affidabile viene da un test o da una gara corta, non da una formula per età.', 'L\'orologio serve a scegliere come misurare la distanza negli allenamenti guidati.'] },
     { q: 'Backup', a: ['Scarica un backup una volta al mese. Il file JSON si può ripristinare; il CSV serve per consultare i dati in un foglio di calcolo.'] },
     { q: 'Invitare altre persone', a: ['Solo l\'amministratore vede la sezione Persone. Ogni invito vale una volta per 7 giorni, fino a 10 persone in tutto. Da lì puoi anche creare un link per una nuova password o eliminare un profilo.', 'Ognuno vede nell\'app solo i propri dati.'] },

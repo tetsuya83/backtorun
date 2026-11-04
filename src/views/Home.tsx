@@ -6,6 +6,7 @@ import { fmtDate, PAIN as words, STRENGTH, todayISO } from '../guide'
 import { BlockList, Note } from '../ui'
 import { History } from './Log'
 import { PlannedToday } from './Workouts'
+import { WeatherCard } from './Weather'
 
 /** Avvisi sul corpo: stanno in Home e in Allenati perché non devono sfuggire. */
 export function BodyAlerts() {
@@ -58,6 +59,7 @@ export function Home() {
       {started && !slot && <><h2>Piano concluso</h2><a class="btn" href="#/mio-piano">Scegli il prossimo obiettivo</a></>}
     </section>
     <PlannedToday />
+    <WeatherCard />
     <nav class="tiles" aria-label="Sezioni">
       <a href="#/oggi"><Ic d={ICON.run} /><b>Allenati</b><small>Seduta del giorno, forza, routine e i tuoi allenamenti</small></a>
       <a href="#/consulta"><Ic d={ICON.chart} /><b>Consulta</b><small>Piano, andamento, test e storico</small></a>

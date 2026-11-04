@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'preact/hooks'
 import { call, clearLocal, data, load, saveCustomPlan, saveState } from '../api'
 import { Field, Note } from '../ui'
 import { RestartButton } from './MyPlan'
+import { WeatherSettings } from './Weather'
 import { isCustom, moveRace, planFor, type Activity } from '../../shared/engine'
 import { painText, watchedZones, ZONES } from '../../shared/pain'
 
@@ -75,6 +76,7 @@ export function Settings({ onLogout }: { onLogout: () => void }) {
       <h2 class="phase">Calendario</h2>
       <Field label="Inizio del piano"><input type="date" value={st.startDate} onChange={e => saveState({ ...st, startDate: e.currentTarget.value })} /></Field>
       {!custom && <Field label="Settimana di partenza"><input type="number" min={1} max={34} value={st.startWeek} onChange={e => saveState({ ...st, startWeek: Math.min(34, Math.max(1, +e.currentTarget.value || 1)) })} /></Field>}
+      <WeatherSettings />
       <Heart />
       <h2 class="phase">Zone da tenere d'occhio</h2>
       <p class="sub pad">Compaiono sempre quando registri una corsa, così non devi aggiungerle ogni volta.</p>
