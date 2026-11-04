@@ -1,6 +1,6 @@
 # BackToRun
 
-La tua app di preparazione alla maratona: piano, allenamenti guidati a blocchi con GPS del telefono o orologio, registrazione manuale o da file FIT, GPX e TCX, dolori per zona del corpo, lavori extra, test, andamento e schede con animazioni nella sezione Impara.
+La tua app di preparazione alla maratona: piano, allenamenti guidati a blocchi con GPS del telefono o orologio, registrazione manuale o da file FIT, GPX e TCX, dolori per zona del corpo, lavori extra, test, andamento e schede illustrate nella sezione Impara.
 
 Ogni persona può usare il piano base, creare un piano per la propria gara (distanza, data, livello, giorni) oppure scrivere la propria tabella. Il piano personale sta in `user_plans`; il piano base resta quello di `shared/plan.json`. Il generatore è in `shared/generator.ts`.
 

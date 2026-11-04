@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks'
-import { Anim } from '../anim'
+import { Illustration } from '../art'
 import { articleById, ARTICLES, GROUPS, type Article } from '../learn'
 import { Note } from '../ui'
 
@@ -7,7 +7,7 @@ const Bullets = ({ title, l }: { title: string; l: string[] }) => l.length ? <se
 function Sheet({ a }: { a: Article }) {
   return <div class="stack">
     <section class="head"><p class="eyebrow"><a href="#/impara">Impara</a></p><h1>{a.title}</h1><p>{a.what}</p></section>
-    {a.anim && <Anim id={a.anim} />}
+    {a.anim && <Illustration id={a.anim} />}
     <Bullets title={a.group === 'mobilita' || a.group === 'forza' ? 'A cosa serve' : 'Utilità e vantaggi'} l={a.why} />
     <section class="panel"><h2>Quando farlo</h2><p>{a.when}</p></section>
     <Bullets title="Come si fa" l={a.how} />
@@ -25,7 +25,7 @@ export function Learn({ route }: { route: string }) {
   return <div class="stack form">
     <section class="head"><h1>Impara</h1><p>Cosa sono gli allenamenti, a cosa servono e come si eseguono.</p></section>
     <input type="search" aria-label="Cerca una scheda" placeholder="Cerca, per esempio polpacci" value={q} onInput={e => setQ(e.currentTarget.value)} />
-    {GROUPS.map(([g, title, sub]) => { const l = ARTICLES.filter(x => x.group === g && hit(x)); return l.length ? <section key={g}><h2 class="phase">{title}</h2><p class="sub pad">{sub}</p><ul class="cards">{l.map(x => <li key={x.id}><a href={`#/impara/${x.id}`}>{x.anim && <Anim id={x.anim} small frame={.5} />}<span><b>{x.title}</b><small>{x.short}</small></span></a></li>)}</ul></section> : null })}
+    {GROUPS.map(([g, title, sub]) => { const l = ARTICLES.filter(x => x.group === g && hit(x)); return l.length ? <section key={g}><h2 class="phase">{title}</h2><p class="sub pad">{sub}</p><ul class="cards">{l.map(x => <li key={x.id}><a href={`#/impara/${x.id}`}>{x.anim && <Illustration id={x.anim} thumb />}<span><b>{x.title}</b><small>{x.short}</small></span></a></li>)}</ul></section> : null })}
     {!ARTICLES.some(hit) && <p class="sub pad">Nessuna scheda trovata.</p>}
   </div>
 }

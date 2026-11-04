@@ -1,4 +1,4 @@
-/* Sezione Impara: contenuti scritti a mano e animazioni nostre, disponibili anche senza rete. */
+/* Sezione Impara: contenuti scritti a mano e illustrazioni nostre, disponibili anche senza rete. */
 export interface Source { title: string; url: string }
 export interface Article { id: string; group: 'corsa' | 'forza' | 'mobilita' | 'base'; title: string; short: string; anim?: string; what: string; why: string[]; when: string; how: string[]; errors: string[]; care?: string; sources?: Source[] }
 const S: Record<string, Source> = {

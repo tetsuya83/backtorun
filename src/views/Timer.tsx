@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { intervalSteps, parseIntervals, routineById, ROUTINES, stepAt, totalOf, type Intervals, type Step } from '../../shared/training'
 import { buzz, clearScheduled, keepAwake, local, say, schedule, unlockSound, type Cue } from '../sound'
 import { Field, Note } from '../ui'
-import { Anim, sceneForStep } from '../anim'
+import { Illustration, sceneForStep } from '../art'
 import { timeOf } from '../fit'
 
 const clock = (s: number) => { const t = Math.max(0, Math.ceil(s)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}` }
@@ -54,7 +54,7 @@ function Player({ steps, sig, title, note, after, lockable }: { steps: Step[]; s
       <section class="tm" aria-live="off">
         <p class="tm-label">{cur.label}</p>
         <p class="tm-time">{clock(s.left)}</p>
-        {cur.tone === 'move' && scene && <Anim key={scene} id={scene} small />}
+        {cur.tone === 'move' && scene && <Illustration key={scene} id={scene} thumb />}
         {cur.cue && <p class="tm-cue">{cur.cue}</p>}
         <div class="tm-bar"><i style={{ width: `${Math.min(100, at() / total * 100)}%` }} /></div>
         <p class="sub">{next ? `Poi: ${next.label} ${clock(next.seconds)}` : 'Ultimo tratto'}, restano {clock(total - at())}</p>

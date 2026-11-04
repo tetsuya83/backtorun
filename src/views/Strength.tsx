@@ -5,7 +5,7 @@ import { jointOk, lastLog, schemeFor, suggest, WORKOUTS, type Exercise, type Exe
 import { fmtDate, painWords, todayISO } from '../guide'
 import { buzz, clearScheduled, keepAwake, local, say, schedule, unlockSound } from '../sound'
 import { Field, nav, Note, Scale } from '../ui'
-import { Anim } from '../anim'
+import { Illustration } from '../art'
 import { articleById } from '../learn'
 import { withPains, type Pain } from '../../shared/pain'
 import { PainPicker } from './Pain'
@@ -31,7 +31,7 @@ function Card({ ex, s, d, set, onDone, ok }: { ex: Exercise; s: Scheme; d: Draft
       {(open || !finished) && <>
         <p>{act.cue}</p>
         {art && <button type="button" class="link" aria-expanded={how} onClick={() => setHow(!how)}>{how ? 'Chiudi' : 'Vedi come si fa'}</button>}
-        {how && art?.anim && <><Anim id={art.anim} small /><a href={`#/impara/${art.id}`}>Scheda completa</a></>}
+        {how && art?.anim && <><Illustration id={art.anim} /><a href={`#/impara/${art.id}`}>Scheda completa</a></>}
         {last && <p class="sub">L'ultima volta: {last.sets.map(x => (x.kg ? `${x.kg} kg × ` : '') + x.reps).join(', ')}</p>}
         <p class={tip.up ? 'up' : 'sub'}>{tip.text}</p>
         {ex.alt && !n && <button type="button" class="link" onClick={() => set(x => ({ ...x, alt: { ...x.alt, [ex.id]: !x.alt[ex.id] } }))}>Fai {(d.alt[ex.id] ? ex : ex.alt).name}</button>}
