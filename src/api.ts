@@ -1,7 +1,7 @@
 import { signal } from '@preact/signals'
-import { defaultState, normalizePlan, type Activity, type Plan, type State } from '../shared/engine'
+import { defaultState, normalizePlan, type Activity, type Plan, type Planned, type State, type Workout } from '../shared/engine'
 export interface TestRec { id: string; date: string; kind: string; data: any }
-export interface Data { plan: Plan; custom?: Plan | null; state: State; activities: Activity[]; tests: TestRec[]; me?: { name: string; isAdmin: boolean } }
+export interface Data { plan: Plan; custom?: Plan | null; state: State; activities: Activity[]; tests: TestRec[]; workouts?: Workout[]; me?: { name: string; isAdmin: boolean } }
 export const data = signal<Data | null>(null)
 export const pending = signal(0)
 export const online = signal(typeof navigator === 'undefined' ? true : navigator.onLine)
@@ -61,7 +61,7 @@ const nextMonday = () => { const d = new Date(); d.setDate(d.getDate() + ((8 - d
 export function switchPlan(mode: 'base' | 'custom') {
   const st = data.value!.state
   if ((st.mode ?? 'base') === mode) { if (!st.mode) saveState({ ...st, mode }); return }
-  saveState({ ...defaultState, startDate: nextMonday(), ...st.other, hrMax: st.hrMax, watch: st.watch, mode, other: core(st) })
+  saveState({ ...defaultState, startDate: nextMonday(), ...st.other, hrMax: st.hrMax, watch: st.watch, planned: st.planned, mode, other: core(st) })
 }
 export function saveCustomPlan(p: Plan) {
   const plan = normalizePlan(p)
@@ -72,9 +72,25 @@ export function saveCustomPlan(p: Plan) {
 /** Attiva un piano appena creato e ne fissa il calendario. */
 export function startCustomPlan(p: Plan, s: Pick<State, 'startDate' | 'raceDate' | 'raceName'>) {
   const st = data.value!.state, plan = saveCustomPlan(p)
-  saveState({ ...s, startWeek: 1, skips: [], repeats: [], hrMax: st.hrMax, watch: st.watch, mode: 'custom', other: st.mode === 'custom' ? st.other : core(st) })
+  saveState({ ...s, startWeek: 1, skips: [], repeats: [], hrMax: st.hrMax, watch: st.watch, planned: st.planned, mode: 'custom', other: st.mode === 'custom' ? st.other : core(st) })
   return plan
 }
+export function saveWorkout(w: Workout) {
+  const d = data.value!; w = { ...w, updatedAt: Date.now() }
+  commit({ ...d, workouts: [w, ...(d.workouts ?? []).filter(x => x.id !== w.id)] })
+  enqueue({ method: 'PUT', url: `/api/workouts/${w.id}`, body: w })
+}
+export function deleteWorkout(id: string) {
+  const d = data.value!
+  commit({ ...d, workouts: (d.workouts ?? []).filter(x => x.id !== id) })
+  enqueue({ method: 'DELETE', url: `/api/workouts/${id}` })
+}
+/** Mette un allenamento in calendario: una sostituzione prende il posto di quella già presente quel giorno. */
+export function addPlanned(p: Planned) {
+  const st = data.value!.state, rest = (st.planned ?? []).filter(x => !(p.mode === 'replace' && x.mode === 'replace' && x.date === p.date))
+  saveState({ ...st, planned: [...rest, p].sort((a, b) => a.date.localeCompare(b.date)) })
+}
+export function removePlanned(id: string) { const st = data.value!.state; saveState({ ...st, planned: (st.planned ?? []).filter(x => x.id !== id) }) }
 export function saveTest(t: TestRec) {
   const d = data.value!
   commit({ ...d, tests: [...d.tests.filter(x => x.id !== t.id), t] })

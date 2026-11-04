@@ -1,13 +1,17 @@
 import type { ExerciseLog } from './training'
-import { blocksError, type Block, type Lap } from './blocks'
+import { blocksError, type Block, type Lap, type Sport } from './blocks'
 import type { Pain } from './pain'
 export type Day = 'lun' | 'mar' | 'mer' | 'gio' | 'ven' | 'sab' | 'dom'
 export const DAYS: Day[] = ['lun', 'mar', 'mer', 'gio', 'ven', 'sab', 'dom']
-export interface Session { day: Day; text: string; km: number | null; fiato?: string | null; fatica?: string | null; race?: boolean; blocks?: Block[] | null }
+export interface Session { day: Day; text: string; km: number | null; fiato?: string | null; fatica?: string | null; race?: boolean; blocks?: Block[] | null; replaced?: boolean }
+/** Un allenamento salvato dall'utente. */
+export interface Workout { id: string; name: string; sport: Sport; text: string; km: number | null; blocks: Block[]; fiato?: string | null; fatica?: string | null; updatedAt?: number }
+/** Copia di un allenamento messa in un giorno del calendario: aggiunta alla giornata o al posto della seduta. */
+export interface Planned extends Omit<Workout, 'updatedAt'> { date: string; mode: 'add' | 'replace'; workoutId?: string | null }
 export interface Week { week: number | string; phase: number; scarico: boolean; skippable: boolean; total: number | null; sessions: Session[]; uid?: string }
 export interface PlanMeta { phases: Record<string, string>; kind?: 'custom'; id?: string; name?: string; strengthDays?: Day[] }
 export interface Plan { meta: PlanMeta; weeks: Week[]; maintenance: Week[] }
-export interface State { startDate: string; startWeek: number; skips: number[]; repeats: number[]; raceDate: string | null; raceName?: string | null; mode?: 'base' | 'custom'; hrMax?: number | null; watch?: string | null; other?: Partial<State> | null }
+export interface State { startDate: string; startWeek: number; skips: number[]; repeats: number[]; raceDate: string | null; raceName?: string | null; mode?: 'base' | 'custom'; hrMax?: number | null; watch?: string | null; planned?: Planned[]; other?: Partial<State> | null }
 export interface Activity {
   id: string; date: string; type: 'corsa' | 'forza' | 'nuoto' | 'bici' | 'altro'; sessionKey?: string | null; source: 'manuale' | 'fit' | 'gpx' | 'tcx' | 'gps'
   km?: number | null; seconds?: number | null; hrAvg?: number | null; hrMax?: number | null; hrLast?: number | null
@@ -39,6 +43,32 @@ export interface Timeline { slots: Slot[]; raceTooClose: boolean; earliestRace: 
 
 /** Calcola il calendario dal piano e dallo stato: salti e ripetizioni spostano tutto, la Fase 4 si aggancia alla gara. */
 export function buildTimeline(plan: Plan, st: State): Timeline {
+  const t = baseTimeline(plan, st), swaps = (st.planned ?? []).filter(p => p.mode === 'replace')
+  if (!swaps.length) return t
+  return { ...t, slots: t.slots.map(s => {
+    const here = swaps.filter(p => p.date >= s.monday && p.date < addDays(s.monday, 7))
+    if (!here.length) return s
+    let total = s.total
+    const sessions = s.sessions.map(x => {
+      const p = here.find(y => y.date === sessionDate(s, x.day))
+      if (!p || x.race) return x
+      if (total != null) total = Math.max(0, total - (x.km ?? 0) + (p.km ?? 0))
+      return { ...x, text: p.text, km: p.km ?? null, blocks: p.blocks, fiato: p.fiato, fatica: p.fatica, replaced: true }
+    })
+    return { ...s, sessions, total }
+  }) }
+}
+export const plannedOn = (st: State, date: string) => (st.planned ?? []).filter(p => p.date === date && p.mode === 'add')
+export const plannedKey = (p: { id: string }) => `p-${p.id}`
+export const MAX_WORKOUTS = 100
+/** Restituisce il problema dell'allenamento, oppure null se va bene. */
+export function workoutError(w: any): string | null {
+  if (!w?.id || (w.sport !== 'corsa' && w.sport !== 'nuoto')) return 'Allenamento non valido.'
+  const n = String(w.name ?? '').trim()
+  if (!n || n.length > 60) return 'Scrivi un nome, massimo 60 caratteri.'
+  return blocksError(w.blocks)
+}
+function baseTimeline(plan: Plan, st: State): Timeline {
   const slots: Slot[] = []
   let monday = mondayOf(st.startDate)
   if (isCustom(plan)) {

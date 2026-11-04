@@ -1,6 +1,7 @@
 /* Una seduta è una sequenza di blocchi. Il testo resta per chi legge e i blocchi guidano l'allenamento. */
 export type Effort = 'walk' | 'easy' | 'steady' | 'race' | 'hard' | 'max'
 export type BlockKind = 'warm' | 'run' | 'reps' | 'hills' | 'strides' | 'cool'
+export type Sport = 'corsa' | 'nuoto'
 export interface Part { sec?: number | null; m?: number | null; effort: Effort }
 export interface Block { kind: BlockKind; part: Part; reps?: number; rest?: Part }
 
@@ -12,6 +13,17 @@ export const EFFORTS: Record<Effort, { label: string; word: string; many: string
   hard: { label: 'Forte', word: 'Z4', many: 'Z4', go: 'Forte', feel: 'Fiatone, solo poche parole', zone: 'Z4', level: 4 },
   max: { label: 'Massimo', word: 'massimali', many: 'massimali', go: 'Al massimo', feel: 'Non riesci a parlare', zone: 'Z5', level: 5 },
 }
+const SWIM: Partial<Record<Effort, { label: string; many: string; go: string; feel: string }>> = {
+  walk: { label: 'Pausa', many: 'pausa', go: 'Pausa', feel: 'Fermo a bordo vasca' },
+  easy: { label: 'Facile', many: 'facili', go: 'Nuota facile', feel: 'Bracciata sciolta, respiro regolare' },
+  steady: { label: 'Medio', many: 'medi', go: 'Ritmo medio', feel: 'Ritmo sostenuto' },
+  hard: { label: 'Forte', many: 'forti', go: 'Forte', feel: 'Impegnato, senza perdere la tecnica' },
+  max: { label: 'Massimo', many: 'massimali', go: 'Al massimo', feel: 'Massimo sforzo' },
+}
+/** Le parole dell'intensità cambiano tra corsa e nuoto. */
+export const effortInfo = (e: Effort, sport: Sport = 'corsa') => sport === 'nuoto' ? { ...EFFORTS[e], ...SWIM[e], word: SWIM[e]?.many ?? EFFORTS[e].word, zone: null } : EFFORTS[e]
+export const SWIM_KINDS: BlockKind[] = ['warm', 'run', 'reps', 'cool']
+export const kindLabel = (k: BlockKind, sport: Sport = 'corsa') => sport === 'nuoto' && k === 'run' ? 'Nuotata continua' : KINDS[k].label
 export const KINDS: Record<BlockKind, { label: string; hint: string }> = {
   warm: { label: 'Riscaldamento', hint: 'Si parte piano per preparare gambe e fiato' },
   run: { label: 'Corsa continua', hint: 'Un tratto unico, a tempo o a distanza' },
@@ -24,15 +36,17 @@ export const KINDS: Record<BlockKind, { label: string; hint: string }> = {
 /* ---------- Stime ---------- */
 // Ritmi prudenti usati solo per dividere la seduta in blocchi: non sono obiettivi.
 const PACE: Record<Effort, number> = { walk: 600, easy: 400, steady: 340, race: 340, hard: 310, max: 290 }
-const partKm = (p: Part) => p.m ? p.m / 1000 : (p.sec ?? 0) / PACE[p.effort]
-const partSec = (p: Part) => p.sec && !p.m ? p.sec : (p.m ?? 0) / 1000 * PACE[p.effort]
+const SWIM_PACE: Record<Effort, number> = { walk: Infinity, easy: 1500, steady: 1300, race: 1300, hard: 1150, max: 1050 }
+const paces = (s: Sport) => s === 'nuoto' ? SWIM_PACE : PACE
+const partKm = (p: Part, s: Sport) => p.m ? p.m / 1000 : (p.sec ?? 0) / paces(s)[p.effort]
+const partSec = (p: Part, s: Sport) => p.sec && !p.m ? p.sec : (p.m ?? 0) / 1000 * paces(s)[p.effort]
 const times = (b: Block) => b.reps ?? 1
-export const blockKm = (b: Block) => times(b) * (partKm(b.part) + (b.rest ? partKm(b.rest) : 0))
-export const blockSec = (b: Block) => times(b) * (partSec(b.part) + (b.rest ? partSec(b.rest) : 0))
+export const blockKm = (b: Block, s: Sport = 'corsa') => times(b) * (partKm(b.part, s) + (b.rest ? partKm(b.rest, s) : 0))
+export const blockSec = (b: Block, s: Sport = 'corsa') => times(b) * (partSec(b.part, s) + (b.rest ? partSec(b.rest, s) : 0))
 const half = (n: number) => Math.round(n * 2) / 2
 /** Km della seduta, stimati se ci sono tratti a tempo. Una seduta solo a tempo non ha km. */
-export const blocksKm = (l: Block[]) => l.some(b => b.part.m || b.rest?.m) ? Math.round(l.reduce((a, b) => a + blockKm(b), 0) * 10) / 10 : null
-export const blocksSec = (l: Block[]) => Math.round(l.reduce((a, b) => a + blockSec(b), 0))
+export const blocksKm = (l: Block[], s: Sport = 'corsa') => l.some(b => b.part.m || b.rest?.m) ? Math.round(l.reduce((a, b) => a + blockKm(b, s), 0) * (s === 'nuoto' ? 100 : 10)) / (s === 'nuoto' ? 100 : 10) : null
+export const blocksSec = (l: Block[], s: Sport = 'corsa') => Math.round(l.reduce((a, b) => a + blockSec(b, s), 0))
 
 /* ---------- Testo ---------- */
 const dist = (m: number) => m >= 1000 ? `${String(Math.round(m / 10) / 100).replace('.', ',')} km` : `${m} m`
@@ -40,10 +54,14 @@ export const clockText = (s: number) => {
   const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = Math.round(s % 60)
   return h ? `${h}h${m ? String(m).padStart(2, '0') + "'" : ''}` : `${m ? m + "'" : ''}${x ? String(x).padStart(2, '0').replace(/^0(?=\d)/, m ? '0' : '') + '"' : ''}` || `0'`
 }
-export const amountText = (p: Part) => [p.m ? dist(p.m) : null, p.sec ? clockText(p.sec) : null].filter(Boolean).join(' o ')
+export const amountText = (p: Part, s: Sport = 'corsa') => [p.m ? s === 'nuoto' ? `${p.m} m` : dist(p.m) : null, p.sec ? clockText(p.sec) : null].filter(Boolean).join(' o ')
 const walkRun = (b: Block) => b.kind === 'reps' && b.part.effort === 'easy' && b.rest?.effort === 'walk'
 /** Riga leggibile di un blocco. */
-export function blockText(b: Block) {
+export function blockText(b: Block, sport: Sport = 'corsa') {
+  if (sport === 'nuoto') {
+    const e = effortInfo(b.part.effort, sport), a = amountText(b.part, sport)
+    return b.reps ? `${b.reps}×[${a} ${e.many} + ${amountText(b.rest!, sport)} ${b.rest!.effort === 'walk' ? 'pausa' : 'facile'}]` : `${a} ${e.many}`
+  }
   const e = EFFORTS[b.part.effort], a = amountText(b.part)
   if (b.kind === 'hills') return `${b.reps}×${a} in salita + ${amountText(b.rest!)} rec`
   if (b.kind === 'strides') return `${b.reps} allunghi ${a}`
@@ -59,14 +77,15 @@ export function blocksTitle(l: Block[]) {
   return null
 }
 /** Il testo di una seduta costruita a blocchi. */
-export function blocksText(l: Block[]) {
+export function blocksText(l: Block[], sport: Sport = 'corsa') {
+  if (sport === 'nuoto') return `Nuoto: ${l.map(b => blockText(b, sport)).join(' + ')}`
   const runs = l.filter(b => b.kind !== 'strides'), only = runs.length === 1 && runs[0].kind === 'run' && runs[0].part.effort === 'easy' ? runs[0] : null
   const strides = l.find(b => b.kind === 'strides')
   if (only) {
     const a = amountText(only.part), name = (only.part.m ?? 0) >= 14000 ? 'Lungo' : 'Facile'
     return `${name} ${a}${strides ? ` + ${blockText(strides)}` : ''}`
   }
-  const t = blocksTitle(l), body = l.map(blockText).join(' + ')
+  const t = blocksTitle(l), body = l.map(b => blockText(b)).join(' + ')
   return t ? `${t}: ${body}` : body
 }
 
@@ -169,24 +188,42 @@ export const TEMPLATES: Template[] = [
   { id: 'salite', label: 'Salite', hint: 'Tratti brevi in salita', fiato: 'Fiatone breve ok, parli prima di ripartire', fatica: '8', learn: 'salite', blocks: () => [{ kind: 'warm', part: km(3) }, rep('hills', 6, { sec: 20, effort: 'hard' }, min(2)), { kind: 'cool', part: km(1) }] },
   { id: 'allunghi', label: 'Facile con allunghi', hint: 'Corsa facile e qualche accelerazione', fiato: 'Frasi complete', fatica: '2-3', learn: 'allunghi', blocks: () => [{ kind: 'run', part: km(5) }, rep('strides', 4, { sec: 15, effort: 'hard' }, { sec: 45, effort: 'easy' })] },
 ]
-export const newBlock = (kind: BlockKind): Block => {
+const pool = (m: number, effort: Effort = 'easy'): Part => ({ m, effort })
+export const SWIM_TEMPLATES: Template[] = [
+  { id: 'n-continua', label: 'Nuotata continua', hint: 'Un tratto unico a ritmo facile', fiato: 'Respiro regolare', fatica: '2-3', learn: '', blocks: () => [{ kind: 'run', part: pool(1000) }] },
+  { id: 'n-ripetute', label: 'Ripetute', hint: 'Vasche forti con pause', fiato: 'Impegnato nei tratti, calmo nelle pause', fatica: '6-7', learn: '', blocks: () => [{ kind: 'warm', part: pool(200) }, rep('reps', 8, pool(50, 'hard'), { sec: 20, effort: 'walk' }), { kind: 'cool', part: pool(100) }] },
+  { id: 'n-fondo', label: 'Fondo a blocchi', hint: 'Tratti lunghi a ritmo sostenuto', fiato: 'Ritmo sostenuto', fatica: '4-5', learn: '', blocks: () => [{ kind: 'warm', part: pool(200) }, rep('reps', 3, pool(300, 'steady'), { sec: 30, effort: 'walk' }), { kind: 'cool', part: pool(100) }] },
+  { id: 'n-recupero', label: 'Recupero attivo', hint: 'Nuoto leggero dopo le corse dure', fiato: 'Respiro regolare', fatica: '2', learn: '', blocks: () => [{ kind: 'run', part: pool(600) }] },
+]
+export const newBlock = (kind: BlockKind, sport: Sport = 'corsa'): Block => {
+  if (sport === 'nuoto') return kind === 'reps' ? rep('reps', 8, pool(50, 'hard'), { sec: 20, effort: 'walk' }) : { kind, part: pool(kind === 'run' ? 1000 : kind === 'warm' ? 200 : 100) }
   if (kind === 'reps') return rep('reps', 5, min(3, 'hard'), min(2))
   if (kind === 'hills') return rep('hills', 6, { sec: 20, effort: 'hard' }, min(2))
   if (kind === 'strides') return rep('strides', 4, { sec: 15, effort: 'hard' }, { sec: 45, effort: 'easy' })
   return { kind, part: kind === 'run' ? km(5) : min(10) }
 }
 /** Fatica e fiato attesi suggeriti dal blocco più impegnativo. */
-export function expected(l: Block[]) {
+export function expected(l: Block[], sport: Sport = 'corsa') {
+  if (sport === 'nuoto') { const t = Math.max(...l.map(b => EFFORTS[b.part.effort].level)); return t >= 4 ? { fiato: 'Impegnato nei tratti, calmo nelle pause', fatica: '6-7' } : t === 3 ? { fiato: 'Ritmo sostenuto', fatica: '4-5' } : { fiato: 'Respiro regolare', fatica: '2-3' } }
   const top = Math.max(...l.map(b => EFFORTS[b.part.effort].level))
   return top >= 4 ? { fiato: 'Fiatone ok nei tratti, calmo nei recuperi', fatica: '7-8' } : top === 3 ? { fiato: 'Frasi brevi, niente fiatone', fatica: '5-6' } : l.some(b => b.rest?.effort === 'walk') ? { fiato: 'Mai fiatone', fatica: '2-3' } : { fiato: 'Frasi complete', fatica: '2-3' }
 }
 
 /* ---------- Guida ---------- */
 export interface GStep { label: string; cue?: string; tone: 'work' | 'rest' | 'move'; sec?: number | null; m?: number | null; effort: Effort }
-export function guideSteps(l: Block[]): GStep[] {
+export function guideSteps(l: Block[], sport: Sport = 'corsa'): GStep[] {
   const out: GStep[] = []
   for (const b of l) {
     const p = b.part
+    if (sport === 'nuoto') {
+      const e = effortInfo(p.effort, sport)
+      if (!b.reps) { out.push({ label: b.kind === 'warm' ? 'Riscaldamento' : b.kind === 'cool' ? 'Defaticamento' : e.go, cue: e.feel, tone: b.kind === 'run' ? 'work' : 'move', sec: p.sec, m: p.m, effort: p.effort }); continue }
+      for (let i = 1; i <= b.reps; i++) {
+        out.push({ label: e.go, cue: `${i} di ${b.reps}. ${e.feel}`, tone: 'work', sec: p.sec, m: p.m, effort: p.effort })
+        if (b.rest) out.push({ label: b.rest.effort === 'walk' ? 'Pausa' : 'Recupera', cue: `${i} di ${b.reps}`, tone: 'rest', sec: b.rest.sec, m: b.rest.m, effort: b.rest.effort })
+      }
+      continue
+    }
     if (!b.reps) { out.push({ label: b.kind === 'warm' ? 'Riscaldamento' : b.kind === 'cool' ? 'Defaticamento' : EFFORTS[p.effort].go, cue: EFFORTS[p.effort].feel, tone: b.kind === 'run' ? 'work' : 'move', sec: p.sec, m: p.m, effort: p.effort }); continue }
     const walk = walkRun(b), name = b.kind === 'hills' ? 'Salita' : b.kind === 'strides' ? 'Allungo' : walk ? 'Corri' : EFFORTS[p.effort].go
     for (let i = 1; i <= b.reps; i++) {

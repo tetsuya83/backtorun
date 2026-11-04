@@ -5,6 +5,7 @@ import { painsOf, painText } from '../../shared/pain'
 import { fmtDate, painWords, STRENGTH, todayISO } from '../guide'
 import { BlockList, Note } from '../ui'
 import { History } from './Log'
+import { PlannedToday } from './Workouts'
 
 /** Avvisi sul corpo: stanno in Home e in Allenati perché non devono sfuggire. */
 export function BodyAlerts() {
@@ -56,8 +57,9 @@ export function Home() {
         {force ? gym ? <div class="done"><strong>Registrato</strong><span>Bel lavoro</span></div> : <a class="btn" href={`#/forza?date=${today}`}>Inizia la forza</a> : <a class="btn ghost" href="#/routine?id=mobility">Mobilità del giorno di riposo</a>}</>}
       {started && !slot && <><h2>Piano concluso</h2><a class="btn" href="#/mio-piano">Scegli il prossimo obiettivo</a></>}
     </section>
+    <PlannedToday />
     <nav class="tiles" aria-label="Sezioni">
-      <a href="#/oggi"><Ic d={ICON.run} /><b>Allenati</b><small>Seduta del giorno, forza, routine e allenamenti liberi</small></a>
+      <a href="#/oggi"><Ic d={ICON.run} /><b>Allenati</b><small>Seduta del giorno, forza, routine e i tuoi allenamenti</small></a>
       <a href="#/consulta"><Ic d={ICON.chart} /><b>Consulta</b><small>Piano, andamento, test e storico</small></a>
       <a href="#/impara"><Ic d={ICON.book} /><b>Impara</b><small>Tipi di allenamento, esercizi e perché farli</small></a>
       <a href="#/impostazioni"><Ic d={ICON.user} /><b>Profilo</b><small>Il tuo piano, orologio, zone e dati</small></a>

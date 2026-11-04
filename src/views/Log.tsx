@@ -82,7 +82,7 @@ export function Log({ route }: { route: string }) {
       {!!a.sets?.length && <section class="panel"><h2>Scheda</h2><ul class="sets-sum">{a.sets.map(x => <li key={x.id}><b>{x.name}</b> {x.sets.map(s => (s.kg ? `${s.kg} kg × ` : '') + s.reps).join(', ')}</li>)}</ul></section>}
       <div class="seg" role="group" aria-label="Tipo di attività">{TYPES.map(([id, l]) => <button type="button" key={id} class={a.type === id ? 'sel' : ''} aria-pressed={a.type === id} onClick={() => up({ type: id })}>{l}</button>)}</div>
       <Field label="Data"><input type="date" value={a.date} onInput={e => up({ date: e.currentTarget.value, sessionKey: null })} required /></Field>
-      {isRun && near.length > 0 && <Field label="Seduta del piano"><select value={a.sessionKey ?? ''} onChange={e => up({ sessionKey: e.currentTarget.value || null })}><option value="">Corsa extra</option>{near.map(o => <option key={o.key} value={o.key}>{o.x.text}</option>)}</select></Field>}
+      {isRun && near.length > 0 && !a.sessionKey?.startsWith('p-') && <Field label="Seduta del piano"><select value={a.sessionKey ?? ''} onChange={e => up({ sessionKey: e.currentTarget.value || null })}><option value="">Corsa extra</option>{near.map(o => <option key={o.key} value={o.key}>{o.x.text}</option>)}</select></Field>}
       <div class="grid2">
         {a.type !== 'forza' && <Field label="Distanza (km)"><input inputMode="decimal" value={a.km ?? ''} onInput={e => up({ km: num(e.currentTarget.value) })} /></Field>}
         <Field label="Durata (mm:ss)"><input inputMode="numeric" placeholder="45:30" value={dur} onInput={e => setDur(e.currentTarget.value)} /></Field>

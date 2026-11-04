@@ -2,7 +2,7 @@ import '@fontsource-variable/inter/wght.css'
 import './style.css'
 import { render } from 'preact'
 import { useEffect, useState } from 'preact/hooks'
-import { call, data, flush, load, online, pending } from './api'
+import { call, data, flush, load, online, pending, saveWorkout, uid } from './api'
 import { Login } from './views/Login'
 import { Today } from './views/Today'
 import { PlanView } from './views/Plan'
@@ -17,13 +17,14 @@ import { BlankPlan, EditPlan, MyPlan, NewPlan } from './views/MyPlan'
 import { Consult, Home } from './views/Home'
 import { Learn } from './views/Learn'
 import { Help } from './views/Help'
+import { Workouts } from './views/Workouts'
 import { FREE, GuideView } from './views/Guide'
 import { Builder } from './views/Builder'
 import { local } from './sound'
 
 const TABS = [
   ['home', 'Home', 'M4 11l8-7 8 7v9h-5v-6H9v6H4z', ['home', 'aiuto']],
-  ['oggi', 'Allenati', 'M4 13h6l2-7 4 13 2-6h2', ['oggi', 'guida', 'registra', 'forza', 'timer', 'routine', 'costruisci']],
+  ['oggi', 'Allenati', 'M4 13h6l2-7 4 13 2-6h2', ['oggi', 'guida', 'registra', 'forza', 'timer', 'routine', 'costruisci', 'allenamenti']],
   ['consulta', 'Consulta', 'M5 19v-6M12 19V6M19 19v-9', ['consulta', 'piano', 'andamento', 'test', 'corsa', 'mio-piano']],
   ['impara', 'Impara', 'M4 5h7a2 2 0 0 1 2 2v13a2 2 0 0 0-2-2H4zM20 5h-5a2 2 0 0 0-2 2v13a2 2 0 0 1 2-2h5z', ['impara']],
   ['impostazioni', 'Profilo', 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0', ['impostazioni']],
@@ -71,6 +72,7 @@ function App() {
         {base.split('/')[0] === 'impara' && <Learn route={base} />}
         {base === 'guida' && <GuideView key={route} route={route} />}
         {base === 'costruisci' && <FreeBuilder />}
+        {base.split('/')[0] === 'allenamenti' && <Workouts key={base} route={base} />}
         {base === 'oggi' && <Today />}
         {base === 'piano' && <PlanView />}
         {base.startsWith('registra') && <Log route={route} />}
@@ -98,7 +100,10 @@ function App() {
   )
 }
 function FreeBuilder() {
-  return <Builder title="Allenamento libero" cta="Vai alla partenza" onCancel={() => { location.hash = '#/oggi' }} onDone={b => { local.set(FREE, { blocks: b.blocks, text: b.text }); location.hash = '#/guida?free=1' }} />
+  return <Builder title="Nuovo allenamento" pickSport named cta="Salva tra i miei allenamenti" second="Parti senza salvare" onCancel={() => { location.hash = '#/allenamenti' }} onDone={b => {
+    if (b.save) { const id = uid(); saveWorkout({ id, name: b.name, sport: b.sport, text: b.text, km: b.km, blocks: b.blocks, fiato: b.fiato || null, fatica: b.fatica || null }); location.hash = '#/allenamenti/' + id; return }
+    local.set(FREE, { blocks: b.blocks, text: b.text, sport: b.sport }); location.hash = '#/guida?free=1'
+  }} />
 }
 export function Logo({ small }: { small?: boolean }) {
   return <span class={'logo' + (small ? ' sm' : '')}><i /><i /><i /><b>BackToRun</b></span>

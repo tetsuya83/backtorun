@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 import planData from '../shared/plan.json'
-import { defaultState, planError } from '../shared/engine'
+import { defaultState, MAX_WORKOUTS, planError, workoutError } from '../shared/engine'
 
 type Env = { Bindings: { DB: D1Database; SETUP_CODE?: string }; Variables: { uid: number } }
 const app = new Hono<Env>()
@@ -19,6 +19,7 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS activities (id TEXT NOT NULL, user_id INTEGER NOT NULL, date TEXT NOT NULL, json TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY (user_id, id))`,
   `CREATE INDEX IF NOT EXISTS idx_act_date ON activities (user_id, date)`,
   `CREATE TABLE IF NOT EXISTS invites (code_hash TEXT PRIMARY KEY, user_id INTEGER, expires_at INTEGER NOT NULL, used_at INTEGER)`,
+  `CREATE TABLE IF NOT EXISTS workouts (id TEXT NOT NULL, user_id INTEGER NOT NULL, json TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY (user_id, id))`,
   `CREATE TABLE IF NOT EXISTS tests (id TEXT NOT NULL, user_id INTEGER NOT NULL, date TEXT NOT NULL, kind TEXT NOT NULL, json TEXT NOT NULL, PRIMARY KEY (user_id, id))`,
 ]
 const MAX_USERS = 10
@@ -145,7 +146,7 @@ const auth = async (c: any, next: any) => {
   if (!s) return c.json({ error: 'Sessione scaduta. Accedi di nuovo.' }, 401)
   c.set('uid', s.user_id); await next()
 }
-for (const p of ['/api/bootstrap', '/api/state', '/api/custom-plan', '/api/activities/*', '/api/tests/*', '/api/import', '/api/admin/*']) app.use(p, auth)
+for (const p of ['/api/bootstrap', '/api/state', '/api/custom-plan', '/api/activities/*', '/api/tests/*', '/api/workouts/*', '/api/import', '/api/admin/*']) app.use(p, auth)
 app.use('/api/admin/*', async (c, next) => {
   const u = await c.env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(c.get('uid')).first<{ is_admin: number }>()
   if (!u?.is_admin) return c.json({ error: 'Riservato all\'amministratore.' }, 403)
@@ -171,18 +172,19 @@ app.post('/api/admin/invites', async c => {
 app.delete('/api/admin/users/:id', async c => {
   const id = +c.req.param('id'), db = c.env.DB
   if (id === c.get('uid')) return c.json({ error: 'Non puoi eliminare il tuo account.' }, 400)
-  await db.batch(['sessions', 'state', 'user_plans', 'activities', 'tests', 'invites'].map(t => db.prepare(`DELETE FROM ${t} WHERE user_id = ?`).bind(id)).concat(db.prepare('DELETE FROM users WHERE id = ?').bind(id)))
+  await db.batch(['sessions', 'state', 'user_plans', 'activities', 'tests', 'workouts', 'invites'].map(t => db.prepare(`DELETE FROM ${t} WHERE user_id = ?`).bind(id)).concat(db.prepare('DELETE FROM users WHERE id = ?').bind(id)))
   return c.json({ ok: true })
 })
 
 const dump = async (db: D1Database, uid: number) => {
-  const [p, s, a, t, u, x] = await db.batch<any>([
+  const [p, s, a, t, u, x, w] = await db.batch<any>([
     db.prepare('SELECT json FROM plan WHERE id = 1'),
     db.prepare('SELECT json FROM state WHERE user_id = ?').bind(uid),
     db.prepare('SELECT json FROM activities WHERE user_id = ? ORDER BY date').bind(uid),
     db.prepare('SELECT json FROM tests WHERE user_id = ? ORDER BY date').bind(uid),
     db.prepare('SELECT name, is_admin FROM users WHERE id = ?').bind(uid),
     db.prepare('SELECT json FROM user_plans WHERE user_id = ?').bind(uid),
+    db.prepare('SELECT json FROM workouts WHERE user_id = ? ORDER BY updated_at DESC').bind(uid),
   ])
   return {
     plan: JSON.parse(p.results[0].json),
@@ -190,6 +192,7 @@ const dump = async (db: D1Database, uid: number) => {
     state: s.results[0] ? JSON.parse(s.results[0].json) : defaultState,
     activities: a.results.map((r: any) => JSON.parse(r.json)),
     tests: t.results.map((r: any) => JSON.parse(r.json)),
+    workouts: w.results.map((r: any) => JSON.parse(r.json)),
     me: { name: u.results[0]?.name, isAdmin: !!u.results[0]?.is_admin },
   }
 }
@@ -198,6 +201,15 @@ const putState = (db: D1Database, uid: number, s: unknown) => db.prepare('INSERT
 const putAct = (db: D1Database, uid: number, a: any) => db.prepare('INSERT INTO activities VALUES (?, ?, ?, ?, ?) ON CONFLICT(user_id, id) DO UPDATE SET date = excluded.date, json = excluded.json, updated_at = excluded.updated_at').bind(a.id, uid, a.date, JSON.stringify(a), Date.now())
 const putTest = (db: D1Database, uid: number, t: any) => db.prepare('INSERT INTO tests VALUES (?, ?, ?, ?, ?) ON CONFLICT(user_id, id) DO UPDATE SET date = excluded.date, json = excluded.json').bind(t.id, uid, t.date, t.kind, JSON.stringify(t))
 const putPlan = (db: D1Database, uid: number, p: unknown) => db.prepare('INSERT INTO user_plans VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET json = excluded.json, updated_at = excluded.updated_at').bind(uid, JSON.stringify(p), Date.now())
+const putWorkout = (db: D1Database, uid: number, w: any) => db.prepare('INSERT INTO workouts VALUES (?, ?, ?, ?) ON CONFLICT(user_id, id) DO UPDATE SET json = excluded.json, updated_at = excluded.updated_at').bind(w.id, uid, JSON.stringify(w), Date.now())
+app.put('/api/workouts/:id', async c => {
+  const w = await c.req.json<any>(), db = c.env.DB, uid = c.get('uid'), e = w.id === c.req.param('id') ? workoutError(w) : 'Allenamento non valido.'
+  if (e) return c.json({ error: e }, 400)
+  const n = await db.prepare('SELECT COUNT(*) n, SUM(id = ?) me FROM workouts WHERE user_id = ?').bind(w.id, uid).first<{ n: number; me: number }>()
+  if ((n?.n ?? 0) >= MAX_WORKOUTS && !n?.me) return c.json({ error: `Puoi salvare al massimo ${MAX_WORKOUTS} allenamenti.` }, 409)
+  await putWorkout(db, uid, w).run(); return c.json({ ok: true })
+})
+app.delete('/api/workouts/:id', async c => { await c.env.DB.prepare('DELETE FROM workouts WHERE user_id = ? AND id = ?').bind(c.get('uid'), c.req.param('id')).run(); return c.json({ ok: true }) })
 app.put('/api/custom-plan', async c => {
   const p = await c.req.json<any>(), e = planError(p)
   if (e) return c.json({ error: e }, 400)
@@ -215,7 +227,8 @@ app.post('/api/import', async c => {
   const d = await c.req.json<any>(), db = c.env.DB, uid = c.get('uid')
   if (!Array.isArray(d.activities) || !d.state) return c.json({ error: 'File di backup non valido.' }, 400)
   if (d.custom && planError(d.custom)) return c.json({ error: 'File di backup non valido.' }, 400)
-  const stm = [putState(db, uid, d.state), ...(d.custom ? [putPlan(db, uid, d.custom)] : []), ...d.activities.map((a: any) => putAct(db, uid, a)), ...(d.tests ?? []).map((t: any) => putTest(db, uid, t))]
+  if ((d.workouts ?? []).some((w: any) => workoutError(w))) return c.json({ error: 'File di backup non valido.' }, 400)
+  const stm = [putState(db, uid, d.state), ...(d.workouts ?? []).map((w: any) => putWorkout(db, uid, w)), ...(d.custom ? [putPlan(db, uid, d.custom)] : []), ...d.activities.map((a: any) => putAct(db, uid, a)), ...(d.tests ?? []).map((t: any) => putTest(db, uid, t))]
   for (let i = 0; i < stm.length; i += 50) await db.batch(stm.slice(i, i + 50))
   return c.json({ ok: true, imported: d.activities.length })
 })

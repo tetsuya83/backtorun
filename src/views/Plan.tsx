@@ -6,6 +6,7 @@ import { phaseName, weekLabel } from './Today'
 import { BlockList, Gauge } from '../ui'
 import { blocksOf } from '../../shared/blocks'
 import { learnFor } from '../learn'
+import { PlannedRow, SaveSession } from './Workouts'
 
 function WeekRow({ s, open, toggle, current }: { s: Slot; open: boolean; toggle: () => void; current: boolean }) {
   const d = data.value!, plan = planFor(d), custom = isCustom(plan), force = strengthDays(plan)
@@ -29,12 +30,13 @@ function WeekRow({ s, open, toggle, current }: { s: Slot; open: boolean; toggle:
           const date = sessionDate(s, x.day), key = sessionKey(s, x.day), a = d.activities.find(z => z.sessionKey === key), b = blocksOf(x), art = learnFor(x.text)
           return <div class="ses" key={x.day}>
             <div class="ses-h"><b>{WEEKDAY[x.day]} {fmtDate(date, { day: 'numeric' })}</b>{a ? <a href={`#/registra?id=${a.id}`}>Fatto, modifica</a> : x.km !== 0 && <a href={`#/registra?key=${key}&date=${date}`}>Registra</a>}</div>
-            <p>{x.text}</p>
+            <p>{x.text}</p>{x.replaced && <p class="sub">Scelta da te al posto della seduta del piano</p>}
             {b && b.length > 1 && x.km !== 0 && <BlockList blocks={b} compact />}
             <Gauge fiato={x.fiato} fatica={x.fatica} />
-            <div class="b-act">{b && x.km !== 0 && !a && <a href={`#/guida?key=${key}&date=${date}`}>Avvia guidato</a>}{art && <a href={`#/impara/${art.id}`}>Cos'è</a>}</div>
+            <div class="b-act">{b && x.km !== 0 && !a && <a href={`#/guida?key=${key}&date=${date}`}>Avvia guidato</a>}{art && <a href={`#/impara/${art.id}`}>Cos'è</a>}{b && x.km !== 0 && <SaveSession s={x} link />}</div>
           </div>
         })}
+        {(d.state.planned ?? []).filter(p => p.mode === 'add' && p.date >= s.monday && p.date < addDays(s.monday, 7)).map(p => <PlannedRow key={p.id} p={p} />)}
         {!s.maintenance && (custom || n <= 34) && <div class="row">
           <button class="btn ghost" onClick={() => saveState({ ...d.state, repeats: [...d.state.repeats, n] })}>Ripeti questa settimana</button>
           {canSkip && <button class="btn ghost" onClick={() => saveState({ ...d.state, skips: [...d.state.skips, n] })}>Salta</button>}

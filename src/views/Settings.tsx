@@ -88,7 +88,7 @@ export function Settings({ onLogout }: { onLogout: () => void }) {
       <h2 class="phase">Backup</h2>
       <p class="sub pad">Scarica un backup ogni mese: il piano gratuito non è un archivio garantito.</p>
       <div class="row">
-        <button class="btn ghost" type="button" onClick={() => save(`backtorun-${stamp}.json`, JSON.stringify({ state: d.state, custom: d.custom ?? null, activities: d.activities, tests: d.tests }), 'application/json')}>Scarica backup</button>
+        <button class="btn ghost" type="button" onClick={() => save(`backtorun-${stamp}.json`, JSON.stringify({ state: d.state, custom: d.custom ?? null, activities: d.activities, tests: d.tests, workouts: d.workouts ?? [] }), 'application/json')}>Scarica backup</button>
         <button class="btn ghost" type="button" onClick={() => save(`backtorun-${stamp}.csv`, '﻿' + csv(d.activities), 'text/csv')}>Scarica CSV</button>
       </div>
       <input ref={f} type="file" accept=".json" hidden onChange={e => restore(e.currentTarget.files?.[0])} />

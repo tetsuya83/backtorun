@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { data } from '../api'
-import { advance, blocksOf, EFFORTS, finishStep, guideProgress, guideSteps, startGuide, stepLeft, timedAhead, type Block, type GStep, type GuideState } from '../../shared/blocks'
-import { buildTimeline, planFor, sessionKey } from '../../shared/engine'
+import { advance, blocksOf, effortInfo, finishStep, guideProgress, guideSteps, startGuide, stepLeft, timedAhead, type Block, type GStep, type GuideState, type Sport } from '../../shared/blocks'
+import { buildTimeline, plannedKey, planFor, sessionKey } from '../../shared/engine'
 import { addFix, newTrack } from '../../shared/gps'
 import { hrMaxOf, kmSplits, zoneHint, zonesFrom } from '../../shared/analysis'
 import { cooldownFor, totalOf, warmupFor } from '../../shared/training'
@@ -10,6 +10,7 @@ import { BlockList, nav, Note } from '../ui'
 import { timeOf, paceOf } from '../fit'
 import { learnFor } from '../learn'
 import type { Activity } from '../../shared/engine'
+import { SaveSession } from './Workouts'
 
 const KEY = 'btr-guide'
 export const RESULT = 'btr-guide-result'
@@ -43,7 +44,7 @@ function useGps(on: boolean, sink: (m: number, alt?: number | null) => void) {
 }
 const GPS_TEXT: Record<Gps, string> = { off: '', cerco: 'Cerco il GPS', ok: 'GPS pronto', debole: 'GPS debole', negato: 'GPS non disponibile' }
 
-function Player({ steps, sig, title, mode, regUrl }: { steps: GStep[]; sig: string; title: string; mode: Mode; regUrl: string }) {
+function Player({ steps, sig, title, mode, regUrl, sport }: { steps: GStep[]; sig: string; title: string; mode: Mode; regUrl: string; sport: Sport }) {
   const saved = useMemo(() => { const s = local.get<Saved>(KEY); return s?.sig === sig ? s : null }, [sig])
   const st = useRef<GuideState>(saved?.st ?? startGuide()), last = useRef<number | null>(null), pendingM = useRef(0)
   const trace = useRef<Trace>(saved?.trace ?? []), alt = useRef<number | null>(null), mark = useRef(0), kmSaid = useRef(Math.floor((saved?.st.dist ?? 0) / 1000))
@@ -89,7 +90,7 @@ function Player({ steps, sig, title, mode, regUrl }: { steps: GStep[]; sig: stri
     tick(n => n + 1)
   }
   useEffect(() => { const iv = setInterval(() => { if (last.current != null) step() }, 500); return () => { clearInterval(iv); clearScheduled(); sleep.current?.() } }, [sig])
-  const go = () => { unlockSound(); gps.reset(); last.current = Date.now(); sleep.current ??= keepAwake(); setRun(true); setLocked(true); store(); queue(); say(steps[st.current.i].label); tick(n => n + 1) }
+  const go = () => { unlockSound(); gps.reset(); last.current = Date.now(); sleep.current ??= keepAwake(); setRun(true); setLocked(useGpsNow); store(); queue(); say(steps[st.current.i].label); tick(n => n + 1) }
   const pause = () => { step(); last.current = null; pendingM.current = 0; clearScheduled(); sleep.current?.(); sleep.current = null; setRun(false); store() }
   const next = () => { // Fatto o Salta: con l'orologio il tratto vale quanto previsto
     const c = steps[st.current.i], s = st.current, full = !useGpsNow && c.m ? c.m : s.m
@@ -99,7 +100,7 @@ function Player({ steps, sig, title, mode, regUrl }: { steps: GStep[]; sig: stri
   }
   const s = st.current, c = steps[s.i], after = steps[s.i + 1], left = stepLeft(c, s), byDist = c.m != null && c.m > 0
   const tap = byDist && !useGpsNow
-  const hint = c.effort && EFFORTS[c.effort].zone ? zoneHint(EFFORTS[c.effort].zone!, hr) : null
+  const zone = effortInfo(c.effort, sport).zone, hint = zone ? zoneHint(zone, hr) : null, swim = sport === 'nuoto'
   if (ended) {
     const km = s.dist >= 50 ? Math.round(s.dist / 10) / 100 : null, seconds = Math.round(s.total)
     const save = () => {
@@ -110,7 +111,7 @@ function Player({ steps, sig, title, mode, regUrl }: { steps: GStep[]; sig: stri
     return <div class="stack"><section class="hero"><p class="eyebrow">{title}</p><h1>Finito</h1>
       <div class="stats run"><div><b>{timeOf(seconds) ?? `0'00"`}</b><span>tempo</span></div><div><b>{km ?? '-'}</b><span>km{!useGpsNow && km ? ' previsti' : ''}</span></div><div><b>{paceOf(km, seconds)?.replace('/km', '') ?? '-'}</b><span>al km</span></div></div>
       <button class="btn" onClick={save}>Registra allenamento</button></section>
-      {!useGpsNow && <Note>Con l'orologio i dati esatti sono nel suo file: puoi caricarlo nella pagina di registrazione.</Note>}
+      {!useGpsNow && <Note>{swim ? 'I metri sono quelli previsti: correggili se hai nuotato di più o di meno.' : "Con l'orologio i dati esatti sono nel suo file: puoi caricarlo nella pagina di registrazione."}</Note>}
       <section><h2 class="phase">Tratti</h2><table class="splits"><tbody>{s.laps.map((l, i) => <tr key={i}><td>{l.label}</td><td>{clock(l.sec)}</td><td>{l.m ? `${kmText(l.m)}${l.m >= 1000 ? ' km' : ' m'}` : ''}</td></tr>)}</tbody></table></section>
     </div>
   }
@@ -121,7 +122,7 @@ function Player({ steps, sig, title, mode, regUrl }: { steps: GStep[]; sig: stri
       <section class="tm" aria-live="off">
         <p class="tm-label">{c.label}</p>
         {byDist && !tap ? <p class="tm-time">{kmText(left.m!)}<small>{left.m! >= 1000 ? ' km' : ' m'}</small></p> : tap ? <p class="tm-time">{kmText(c.m!)}<small>{c.m! >= 1000 ? ' km' : ' m'}</small></p> : <p class="tm-time">{clock(left.sec ?? 0)}</p>}
-        {byDist && <p class="sub">{tap ? `Guarda l'orologio e tocca Fatto. Sei a ${clock(s.t)}` : `Da ${clock(s.t)}`}{c.sec ? `, massimo ${clock(c.sec)}` : ''}</p>}
+        {byDist && <p class="sub">{tap ? `${swim ? 'Tocca Fatto a fine tratto' : "Guarda l'orologio e tocca Fatto"}. Sei a ${clock(s.t)}` : `Da ${clock(s.t)}`}{c.sec ? `, massimo ${clock(c.sec)}` : ''}</p>}
         {c.cue && <p class="tm-cue">{c.cue}</p>}
         {hint && <p class="zonehint">{hint}</p>}
         <div class="tm-bar"><i style={{ width: `${guideProgress(steps, s) * 100}%` }} /></div>
@@ -133,7 +134,7 @@ function Player({ steps, sig, title, mode, regUrl }: { steps: GStep[]; sig: stri
       </div>
       {s.total > 0 && <button class="btn ghost" onClick={finish}>Termina qui</button>}
       {gps.status === 'negato' && <Note tone="stop"><strong>Non riesco a usare il GPS.</strong> Controlla il permesso di posizione del browser, oppure torna indietro e scegli l'orologio.</Note>}
-      <Note>Tieni l'app aperta e lo schermo acceso: a telefono bloccato GPS, suoni e vibrazione possono fermarsi. Se compare dolore, cammina e fermati.</Note>
+      <Note>{swim ? "Lascia il telefono a bordo vasca, al riparo dall'acqua, con l'app aperta e lo schermo acceso. Se compare dolore, fermati." : "Tieni l'app aperta e lo schermo acceso: a telefono bloccato GPS, suoni e vibrazione possono fermarsi. Se compare dolore, cammina e fermati."}</Note>
       {locked && <div class="veil"><button class="btn ghost hold" onPointerDown={() => { hold.current = setTimeout(() => setLocked(false), 800) }} onPointerUp={() => clearTimeout(hold.current)} onPointerLeave={() => clearTimeout(hold.current)} onContextMenu={e => e.preventDefault()}>Tieni premuto per sbloccare</button></div>}
     </div>
   )
@@ -144,25 +145,33 @@ const fromSaved = (sig: string) => local.get<Saved>(KEY)?.sig === sig
 export function GuideView({ route }: { route: string }) {
   const d = data.value!, q = new URLSearchParams(route.split('?')[1] ?? ''), key = q.get('key'), date = q.get('date')
   const ses = useMemo(() => { if (!key) return null; const plan = planFor(d); for (const s of buildTimeline(plan, d.state).slots) for (const x of s.sessions) if (sessionKey(s, x.day) === key) return x; return null }, [key])
-  const free = useMemo(() => q.get('free') ? local.get<{ blocks: Block[]; text: string }>(FREE) : null, [])
-  const blocks = ses ? blocksOf(ses) : free?.blocks ?? null, title = ses?.text ?? free?.text ?? 'Allenamento'
-  const steps = useMemo(() => blocks ? guideSteps(blocks) : [], [blocks]), sig = `g${key ?? title}`
+  const free = useMemo(() => {
+    if (q.get('free')) return local.get<{ blocks: Block[]; text: string; sport?: Sport }>(FREE)
+    if (q.get('workout')) return (d.workouts ?? []).find(w => w.id === q.get('workout')) ?? null
+    if (q.get('planned')) return (d.state.planned ?? []).find(p => p.id === q.get('planned')) ?? null
+    return null
+  }, [])
+  const blocks = ses ? blocksOf(ses) : free?.blocks ?? null, title = ses?.text ?? (free as any)?.name ?? free?.text ?? 'Allenamento', sport: Sport = free?.sport ?? 'corsa', swim = sport === 'nuoto'
+  const steps = useMemo(() => blocks ? guideSteps(blocks, sport) : [], [blocks]), sig = `g${key ?? q.get('workout') ?? q.get('planned') ?? title}`
   const needsDist = steps.some(s => s.m)
-  const [mode, setMode] = useState<Mode>(d.state.watch ? 'watch' : 'gps'), [start, setStart] = useState(() => fromSaved(sig))
+  const [mode, setMode] = useState<Mode>(d.state.watch || swim ? 'watch' : 'gps'), [start, setStart] = useState(() => fromSaved(sig))
   if (!blocks) return <div class="stack"><section class="head"><h1>Seduta non guidabile</h1><p>Questa seduta non ha blocchi. Puoi costruirne una adesso.</p></section><a class="btn" href="#/costruisci">Costruisci allenamento</a></div>
-  const reg = `#/registra?${key ? `key=${encodeURIComponent(key)}&date=${date}&` : ''}guide=1`
+  const pl = q.get('planned') ? free as any : null, linked = key ?? (pl ? plannedKey(pl) : null), when = date ?? pl?.date
+  const reg = `#/registra?${linked ? `key=${encodeURIComponent(linked)}&date=${when}&` : ''}type=${swim ? 'nuoto' : 'corsa'}&guide=1`
   const m = local.get<Saved>(KEY)
-  if (start) return <Player steps={steps} sig={sig} title={title} mode={m?.sig === sig ? m.mode : mode} regUrl={reg} />
-  const warm = warmupFor(title), cool = cooldownFor(title, ses?.km), art = learnFor(title), hasWarm = blocks.some(b => b.kind === 'warm')
+  if (start) return <Player steps={steps} sig={sig} title={title} mode={m?.sig === sig ? m.mode : mode} regUrl={reg} sport={sport} />
+  const warm = warmupFor(title), cool = cooldownFor(title, ses?.km), art = swim ? null : learnFor(title), hasWarm = blocks.some(b => b.kind === 'warm')
   return <div class="stack form">
     <section class="head"><p class="eyebrow">Allenamento guidato</p><h1>{title}</h1>{ses && (ses.fiato || ses.fatica) && <p>{[ses.fiato, ses.fatica ? `fatica ${ses.fatica}` : null].filter(Boolean).join(', ')}</p>}</section>
-    <section class="panel"><BlockList blocks={blocks} /></section>
-    {needsDist && <fieldset class="scale"><legend>Come misuri la distanza?</legend><div class="seg"><button type="button" class={mode === 'gps' ? 'sel' : ''} aria-pressed={mode === 'gps'} onClick={() => setMode('gps')}>GPS del telefono</button><button type="button" class={mode === 'watch' ? 'sel' : ''} aria-pressed={mode === 'watch'} onClick={() => setMode('watch')}>Orologio</button></div>
+    <section class="panel"><BlockList blocks={blocks} sport={sport} /></section>
+    {swim && <Note>In piscina il telefono non misura i metri: i tratti a tempo avanzano da soli, quelli a distanza con Fatto.</Note>}
+    {needsDist && !swim && <fieldset class="scale"><legend>Come misuri la distanza?</legend><div class="seg"><button type="button" class={mode === 'gps' ? 'sel' : ''} aria-pressed={mode === 'gps'} onClick={() => setMode('gps')}>GPS del telefono</button><button type="button" class={mode === 'watch' ? 'sel' : ''} aria-pressed={mode === 'watch'} onClick={() => setMode('watch')}>Orologio</button></div>
       <small>{mode === 'gps' ? 'I tratti a distanza finiscono da soli.' : "Guardi i km sull'orologio e tocchi Fatto a fine tratto."}</small></fieldset>}
-    {!hasWarm && <a class="btn ghost" href={`#/routine?id=${warm.id}`}>Prima: {warm.name}, {Math.round(totalOf(warm.steps) / 60)} min</a>}
+    {!hasWarm && !swim && <a class="btn ghost" href={`#/routine?id=${warm.id}`}>Prima: {warm.name}, {Math.round(totalOf(warm.steps) / 60)} min</a>}
     <button class="btn" onClick={() => { unlockSound(); setStart(true) }}>Prepara la partenza</button>
     {art && <a class="btn ghost" href={`#/impara/${art.id}`}>Cos'è: {art.title}</a>}
-    <a class="btn ghost" href={`#/routine?id=${cool.id}`}>Dopo: {cool.name}</a>
+    {!swim && <a class="btn ghost" href={`#/routine?id=${cool.id}`}>Dopo: {cool.name}</a>}
+    {ses && <SaveSession s={ses} />}
     {reg && <button type="button" class="link" onClick={() => nav(reg.slice(2).replace('guide=1', '').replace(/&$/, ''))}>Registra senza guida</button>}
   </div>
 }

@@ -1,7 +1,7 @@
 import type { ComponentChildren } from 'preact'
 import { BREATH, breathLevel } from './guide'
 import { upper } from '../shared/engine'
-import { blockSec, blockText, EFFORTS, KINDS, type Block } from '../shared/blocks'
+import { blockSec, blockText, EFFORTS, kindLabel, type Block, type Sport } from '../shared/blocks'
 export const nav = (p: string) => { location.hash = '#/' + p }
 export function Gauge({ fiato, fatica }: { fiato?: string | null; fatica?: string | null }) {
   const b = breathLevel(fiato)
@@ -35,11 +35,11 @@ export const Note = ({ tone, children }: { tone?: 'stop' | 'go'; children: Compo
 export function Field({ label, children }: { label: string; children: ComponentChildren }) { return <label class="field"><span>{label}</span>{children}</label> }
 export const breathHint = (v?: number | null) => v ? BREATH[v - 1] : undefined
 /** Lo schema della seduta: l'altezza è l'intensità, la larghezza la durata stimata. */
-export function BlockList({ blocks, compact }: { blocks: Block[]; compact?: boolean }) {
-  const segs = blocks.flatMap(b => { const n = Math.min(b.reps ?? 1, 12), each = blockSec(b) / n; return Array.from({ length: n }, () => b.rest ? [{ e: b.part.effort, w: each * .5 }, { e: b.rest.effort, w: each * .5 }] : [{ e: b.part.effort, w: each }]).flat() })
+export function BlockList({ blocks, compact, sport }: { blocks: Block[]; compact?: boolean; sport?: Sport }) {
+  const segs = blocks.flatMap(b => { const n = Math.min(b.reps ?? 1, 12), each = blockSec(b, sport) / n; return Array.from({ length: n }, () => b.rest ? [{ e: b.part.effort, w: each * .5 }, { e: b.rest.effort, w: each * .5 }] : [{ e: b.part.effort, w: each }]).flat() })
   const tot = segs.reduce((a, x) => a + x.w, 0) || 1
   return <div class="schema">
-    <div class="profile" style={{ height: `${Math.max(...segs.map(x => EFFORTS[x.e].level)) * 11}px` }} role="img" aria-label={blocks.map(blockText).join(', ')}>{segs.map((x, i) => <i key={i} data-level={EFFORTS[x.e].level} style={{ flexGrow: Math.max(x.w / tot * 100, 1.6), height: `${EFFORTS[x.e].level * 100 / Math.max(...segs.map(y => EFFORTS[y.e].level))}%` }} />)}</div>
-    {!compact && <ol>{blocks.map((b, i) => <li key={i}><span>{KINDS[b.kind].label}</span><b>{blockText(b)}</b></li>)}</ol>}
+    <div class="profile" style={{ height: `${Math.max(...segs.map(x => EFFORTS[x.e].level)) * 11}px` }} role="img" aria-label={blocks.map(b => blockText(b, sport)).join(', ')}>{segs.map((x, i) => <i key={i} data-level={EFFORTS[x.e].level} style={{ flexGrow: Math.max(x.w / tot * 100, 1.6), height: `${EFFORTS[x.e].level * 100 / Math.max(...segs.map(y => EFFORTS[y.e].level))}%` }} />)}</div>
+    {!compact && <ol>{blocks.map((b, i) => <li key={i}><span>{kindLabel(b.kind, sport)}</span><b>{blockText(b, sport)}</b></li>)}</ol>}
   </div>
 }

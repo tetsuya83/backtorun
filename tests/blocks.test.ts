@@ -134,3 +134,37 @@ describe('guida', () => {
     for (const s of HELP) for (const i of s.items) expect(i.a.length, i.q).toBeGreaterThan(0)
   })
 })
+import { addPlanned, data, removePlanned } from '../src/api'
+import { buildTimeline, defaultState, plannedOn, reviewWeek, sessionDate, workoutError, type Planned } from '../shared/engine'
+import { blockText, SWIM_TEMPLATES } from '../shared/blocks'
+describe('allenamenti salvati', () => {
+  const w = { id: 'a', name: 'Prova', sport: 'corsa', blocks: TEMPLATES[0].blocks() }
+  it('controlla nome, sport e blocchi', () => {
+    expect(workoutError(w)).toBeNull(); expect(workoutError({ ...w, name: ' ' })).toMatch(/nome/); expect(workoutError({ ...w, sport: 'bici' })).toMatch(/valido/); expect(workoutError({ ...w, blocks: [] })).toMatch(/blocco/)
+  })
+  const t0 = buildTimeline(P, defaultState), s = t0.slots[0], x = s.sessions[0], date = sessionDate(s, x.day)
+  const p = (mode: Planned['mode'], d = date): Planned => ({ id: 'p1', name: 'Mia', sport: 'corsa', text: 'Facile 5 km', km: 5, blocks: TEMPLATES[0].blocks(), date: d, mode })
+  it('sostituisce solo quella seduta, restando seduta del piano', () => {
+    const t = buildTimeline(P, { ...defaultState, planned: [p('replace')] }), n = t.slots[0].sessions[0]
+    expect(n.text).toBe('Facile 5 km'); expect(n.replaced).toBe(true); expect(n.day).toBe(x.day); expect(t.slots[0].key).toBe(s.key); expect(t.slots[1].sessions[0].replaced).toBeUndefined()
+  })
+  it('un allenamento aggiunto non tocca sedute né revisione', () => {
+    const st = { ...defaultState, planned: [p('add')] }, t = buildTimeline(P, st)
+    expect(t.slots[0].sessions).toEqual(s.sessions); expect(plannedOn(st, date).length).toBe(1)
+    expect(reviewWeek(t, t.slots[0], []).reasons).toEqual(reviewWeek(t0, s, []).reasons)
+  })
+  it('una seconda sostituzione nello stesso giorno prende il posto della prima', () => {
+    data.value = { plan: P, state: { ...defaultState }, activities: [], tests: [] }
+    addPlanned(p('replace')); addPlanned({ ...p('replace'), id: 'p2' }); addPlanned({ ...p('add'), id: 'p3' })
+    expect(data.value!.state.planned!.map(q => q.id)).toEqual(['p2', 'p3']); removePlanned('p3'); expect(data.value!.state.planned!.length).toBe(1)
+  })
+})
+describe('nuoto', () => {
+  const b = SWIM_TEMPLATES[1].blocks()
+  it('usa metri e parole del nuoto', () => {
+    expect(blockText(b[1], 'nuoto')).toBe('8×[50 m forti + 20" pausa]'); expect(blocksText(b, 'nuoto')).toBe('Nuoto: 200 m facili + 8×[50 m forti + 20" pausa] + 100 m facili')
+    expect(blocksKm(b, 'nuoto')).toBe(.7)
+    const st = guideSteps(b, 'nuoto'); expect(st.map(x => x.label).slice(0, 3)).toEqual(['Riscaldamento', 'Forte', 'Pausa']); expect(st[2].sec).toBe(20); expect(st[1].m).toBe(50)
+  })
+  it('i modelli sono validi', () => { for (const t of SWIM_TEMPLATES) expect(blocksError(t.blocks())).toBeNull() })
+})

@@ -5,6 +5,7 @@ import { BlockList, Gauge, Note } from '../ui'
 import { blocksOf } from '../../shared/blocks'
 import { learnFor } from '../learn'
 import { BodyAlerts } from './Home'
+import { PlannedToday } from './Workouts'
 import { paceOf, timeOf } from '../fit'
 import { hrMaxOf, zoneHint, zonesFrom } from '../../shared/analysis'
 import { cooldownFor, routineById, totalOf, warmupFor, type Routine } from '../../shared/training'
@@ -86,12 +87,14 @@ export function Today() {
         <p>Hai rispettato tutte le condizioni. Se la salti, il calendario si aggiorna da solo.</p>
         <button class="btn" onClick={() => saveState({ ...d.state, skips: [...d.state.skips, rv.next!.week as number] })}>Salta la settimana {rv.next.week}</button>
       </section>}
+      <PlannedToday />
       {nextDate && nextSlot && <section class="panel">
         <h2>Prossima corsa: {fmtDate(nextDate, { weekday: 'long', day: 'numeric' })}</h2>
         <p>{nextSlot.sessions.find(x => sessionDate(nextSlot, x.day) === nextDate)?.text}</p>
       </section>}
       <h2 class="phase">Altro</h2>
       <ul class="cards">
+        <li><a href="#/allenamenti"><span><b>I miei allenamenti</b><small>Corsa e nuoto salvati, da avviare o mettere nel piano</small></span></a></li>
         <li><a href="#/costruisci"><span><b>Costruisci un allenamento</b><small>Scegli un modello, adatta i blocchi e parti</small></span></a></li>
         <li><a href={`#/forza?date=${today}`}><span><b>Forza</b><small>Scheda guidata, in palestra o a casa</small></span></a></li>
         <li><a href="#/routine"><span><b>Routine e timer libero</b><small>Riscaldamento, mobilità, defaticamento</small></span></a></li>
