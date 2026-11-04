@@ -56,7 +56,7 @@ function App() {
   if (!data.value) return null
   const asked = route.split('?')[0]
   // chi arriva su invito sceglie il piano al primo accesso
-  const base = !data.value.state.mode && !data.value.me?.isAdmin && !asked.startsWith('mio-piano') ? 'mio-piano' : asked
+  const base = !data.value.state.mode && !asked.startsWith('mio-piano') && asked !== 'aiuto' ? 'mio-piano' : asked
   return (
     <div class="app">
       <header class="top">

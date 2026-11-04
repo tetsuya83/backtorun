@@ -4,7 +4,7 @@ import { topKg } from '../../shared/training'
 import { hrMaxOf, loadAlert, samePace, weeklyLoads, zonesFrom } from '../../shared/analysis'
 import { Field, Note } from '../ui'
 import { addDays, buildTimeline, isCustom, planFor, sessionKey, upper, type Slot } from '../../shared/engine'
-import { fmtDate, painWords, todayISO } from '../guide'
+import { fmtDate, PAIN, todayISO } from '../guide'
 import { zoneCounts, zoneLabel } from '../../shared/pain'
 import { paceOf } from '../fit'
 
@@ -73,7 +73,7 @@ export function Trends() {
       {alert && <Note><strong>Carico in salita.</strong> Questa settimana sei a {alert.load}, il {alert.pct}% sopra la media recente di {alert.avg}. Se non lo hai scelto tu, tieni facili le prossime sedute.</Note>}
       {loads.some(w => w.load > 0) && <><Bars rows={shown.map(w => ({ label: fmtDate(w.monday, { day: 'numeric', month: 'numeric' }), done: w.load, plan: null }))} title="Carico settimanale" unit="punti" /><p class="sub pad">Minuti per fatica di tutti gli allenamenti.{noLoad ? ` ${noLoad} senza durata o fatica non sono conteggiati.` : ''}</p></>}
       {fat.length > 1 && <Line pts={fat} max={10} title="Fatica reale e attesa" unit="/10" />}
-      {knee.length > 1 && <Line pts={knee} max={10} title={acts0.some(a => a.pains?.some(p => p.zone !== 'ginocchio')) ? 'Dolore, valore più alto' : painWords(isCustom(plan)).chart} unit="/10" ref2={2} />}
+      {knee.length > 1 && <Line pts={knee} max={10} title={PAIN.chart} unit="/10" ref2={2} />}
       {zones.length > 0 && <section class="panel"><h2>Zone che hanno dato dolore</h2><table class="splits"><tbody>{zones.map(z => <tr key={z.zone}><td>{zoneLabel(z.zone)}</td><td>{z.times} {z.times === 1 ? 'volta' : 'volte'}</td><td>fino a {z.top}</td></tr>)}</tbody></table><p>Negli ultimi 30 allenamenti. Se una zona torna spesso, conviene farla valutare.</p></section>}
       <Loads />
       {!z2 && <p class="sub pad"><a href="#/impostazioni">Imposta la FC massima</a> per vedere il ritmo in Z2.</p>}

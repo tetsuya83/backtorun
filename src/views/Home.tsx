@@ -2,7 +2,7 @@ import { data, saveActivity } from '../api'
 import { addDays, buildTimeline, isCustom, planFor, sessionDate, sessionKey, slotForDate, DAYS, strengthDays } from '../../shared/engine'
 import { blocksOf } from '../../shared/blocks'
 import { painsOf, painText } from '../../shared/pain'
-import { fmtDate, painWords, STRENGTH, todayISO } from '../guide'
+import { fmtDate, PAIN as words, STRENGTH, todayISO } from '../guide'
 import { BlockList, Note } from '../ui'
 import { History } from './Log'
 import { PlannedToday } from './Workouts'
@@ -13,7 +13,7 @@ export function BodyAlerts() {
   const lastRun = [...d.activities].reverse().find(a => a.type === 'corsa')
   const worst = lastRun ? [...painsOf(lastRun, custom ? 'altro' : 'ginocchio')].sort((a, b) => b.level - a.level)[0] : undefined
   const other = !!worst && worst.level > 0 && worst.zone !== 'ginocchio' && worst.zone !== 'altro'
-  const words = painWords(custom || other), who = other ? `${painText(worst!)}. ` : ''
+  const who = other ? `${painText(worst!)}. ` : ''
   const check = d.activities.find(a => a.type === 'corsa' && a.date === yest && a.swelling == null)
   const stop = lastRun?.locked, swollen = lastRun && !lastRun.locked && (lastRun.swelling || (lastRun.knee ?? 0) > 2)
   return <>

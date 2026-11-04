@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'preact/hooks'
 import { data, saveActivity, uid } from '../api'
-import { buildTimeline, isCustom, planFor, slotForDate } from '../../shared/engine'
+import { buildTimeline, planFor, slotForDate } from '../../shared/engine'
 import { jointOk, lastLog, schemeFor, suggest, WORKOUTS, type Exercise, type ExerciseLog, type Place, type Scheme } from '../../shared/training'
-import { fmtDate, painWords, todayISO } from '../guide'
+import { fmtDate, PAIN as words, todayISO } from '../guide'
 import { buzz, clearScheduled, keepAwake, local, say, schedule, unlockSound } from '../sound'
 import { Field, nav, Note, Scale } from '../ui'
 import { Illustration } from '../art'
 import { articleById } from '../learn'
-import { withPains, type Pain } from '../../shared/pain'
+import { watchedZones, withPains, type Pain } from '../../shared/pain'
 import { PainPicker } from './Pain'
 
 const KEY = 'btr-forza', PLACE = 'btr-forza-luogo'
@@ -49,11 +49,11 @@ function Card({ ex, s, d, set, onDone, ok }: { ex: Exercise; s: Scheme; d: Draft
 }
 
 export function Strength({ route }: { route: string }) {
-  const app = data.value!, plan = planFor(app), words = painWords(isCustom(plan))
+  const app = data.value!, plan = planFor(app)
   const date = new URLSearchParams(route.split('?')[1] ?? '').get('date') ?? todayISO()
   const slot = useMemo(() => slotForDate(buildTimeline(plan, app.state), date), [plan, app.state, date])
   const [d, setD] = useState<Draft>(() => local.get<Draft>(KEY) ?? fresh(date, local.get<Place>(PLACE) ?? 'palestra'))
-  const [end, setEnd] = useState(0), [, tick] = useState(0), [fatica, setFatica] = useState<number | null>(null), [pains, setPains] = useState<Pain[]>(() => isCustom(plan) ? [] : [{ zone: 'ginocchio', level: 0 }])
+  const [end, setEnd] = useState(0), [, tick] = useState(0), [fatica, setFatica] = useState<number | null>(null), [pains, setPains] = useState<Pain[]>(() => watchedZones(app).map(zone => ({ zone, level: 0 })))
   const [note, setNote] = useState(''), [err, setErr] = useState('')
   const set = (f: (x: Draft) => Draft) => setD(x => { const n = f(x); local.set(KEY, n); return n })
   useEffect(() => keepAwake(), [])

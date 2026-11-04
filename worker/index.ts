@@ -77,7 +77,7 @@ async function createUser(c: any, name: string, password: string, admin: number)
   const salt = hex(crypto.getRandomValues(new Uint8Array(16)))
   const r = await c.env.DB.prepare('INSERT INTO users (pass_hash, salt, created_at, name, is_admin) VALUES (?, ?, ?, ?, ?)').bind(await hashPass(password, salt), salt, Date.now(), name, admin).run()
   const uid = r.meta.last_row_id as number
-  await c.env.DB.prepare('INSERT INTO state VALUES (?, ?)').bind(uid, JSON.stringify({ ...defaultState, startDate: admin ? defaultState.startDate : nextMonday() })).run()
+  await c.env.DB.prepare('INSERT INTO state VALUES (?, ?)').bind(uid, JSON.stringify({ ...defaultState, startDate: nextMonday() })).run()
   return uid
 }
 app.post('/api/setup', async c => {

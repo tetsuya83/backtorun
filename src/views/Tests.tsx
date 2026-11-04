@@ -5,7 +5,7 @@ import { fmtDate, todayISO } from '../guide'
 import { breathHint, Field, Note, Scale } from '../ui'
 
 const empty = (): ScalaRound => ({ finished: null, fiato: null, fatica: null, knee: null, hrEnd: null, hr1: null, quit: null, quitMin: null })
-const FAIL = ['Fiato', 'Gambe', 'Ginocchio', 'Testa', 'Niente']
+const FAIL = ['Fiato', 'Gambe', 'Dolore', 'Testa', 'Niente']
 export function Tests() {
   const d = data.value!, custom = isCustom(planFor(d))
   const last = [...d.tests].filter(t => t.kind === 'scala').sort((a, b) => a.date.localeCompare(b.date)).at(-1)
@@ -35,20 +35,20 @@ export function Tests() {
       </section>
       <Scale label="Fiato" max={5} value={r.fiato} onChange={v => up({ fiato: v })} hint={breathHint(r.fiato)} />
       <Scale label="Fatica" max={10} value={r.fatica} onChange={v => up({ fatica: v })} />
-      <Scale label={custom ? 'Dolore' : 'Ginocchio'} min={0} max={10} value={r.knee} onChange={v => up({ knee: v })} />
+      <Scale label="Dolore" min={0} max={10} value={r.knee} onChange={v => up({ knee: v })} />
       <div class="grid2">
         <Field label="FC a fine corsa"><input inputMode="numeric" value={r.hrEnd ?? ''} onInput={e => up({ hrEnd: num(e.currentTarget.value) })} /></Field>
         <Field label="FC dopo 1' di cammino"><input inputMode="numeric" value={r.hr1 ?? ''} onInput={e => up({ hr1: num(e.currentTarget.value) })} /></Field>
       </div>
       <Scale label="Voglia di smettere" min={0} max={10} value={r.quit} onChange={v => up({ quit: v })} />
-      {stop && <Note tone="stop"><strong>Fermati qui.</strong> Fiato a 4 per oltre 1', ginocchio sopra 2 o corsa scomposta chiudono il test.</Note>}
+      {stop && <Note tone="stop"><strong>Fermati qui.</strong> Fiato a 4 per oltre 1', dolore sopra 2 o corsa scomposta chiudono il test.</Note>}
       {cur < 4 && r.finished && !stop && <button type="button" class="btn ghost" onClick={() => { setCur(cur + 1); persist(); scrollTo(0, 0) }}>Vai al round {cur + 2}</button>}
       {anyDone && <section class="panel go result">
         <p class="eyebrow">{res.closedRounds ? `${res.closedRounds} ${res.closedRounds === 1 ? 'round chiuso' : 'round chiusi'}` : 'Nessun round chiuso'}{res.bonus ? ', con bonus' : ''}</p>
         {!custom && <h2>Parti dalla settimana {res.week}</h2>}
         <fieldset class="scale"><legend>Cosa ha ceduto per primo?</legend><div class="seg">{FAIL.map(f => <button type="button" key={f} class={first === f ? 'sel' : ''} onClick={() => setFirst(f)}>{f}</button>)}</div></fieldset>
-        <Scale label="Mercoledì mattina: dolore al ginocchio" min={0} max={10} value={wed} onChange={setWed} />
-        <label class="check"><input type="checkbox" checked={swollen} onChange={e => setSwollen(e.currentTarget.checked)} /> Mercoledì mattina il ginocchio è gonfio</label>
+        <Scale label="Il giorno dopo: dolore al mattino" min={0} max={10} value={wed} onChange={setWed} />
+        <label class="check"><input type="checkbox" checked={swollen} onChange={e => setSwollen(e.currentTarget.checked)} /> Il giorno dopo ho gonfiore</label>
         {custom ? <button class="btn ghost" type="button" onClick={() => persist()}>Salva il test</button> : <button class="btn" type="button" onClick={() => { persist(); saveState({ ...d.state, startWeek: res.week, skips: [], repeats: [] }); setApplied(true) }}>{applied ? 'Partenza impostata' : `Parti dalla settimana ${res.week}`}</button>}
       </section>}
       <p class="sub pad">Test non validato: le soglie sono stime da allenatore.</p>

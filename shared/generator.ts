@@ -1,8 +1,8 @@
 import { addDays, DAYS, diffDays, mondayOf, normalizePlan, type Day, type Plan, type Session, type Week } from './engine'
 
-export type RaceType = '5k' | '10k' | '21k' | '42k' | 'trail' | 'altro'
+export type RaceType = 'forma' | '5k' | '10k' | '21k' | '42k' | 'trail' | 'altro'
 export const RACES: { id: RaceType; label: string; km: number | null }[] = [
-  { id: '5k', label: '5 km', km: 5 }, { id: '10k', label: '10 km', km: 10 }, { id: '21k', label: 'Mezza maratona', km: 21.097 },
+  { id: 'forma', label: 'Stare in forma', km: 10 }, { id: '5k', label: '5 km', km: 5 }, { id: '10k', label: '10 km', km: 10 }, { id: '21k', label: 'Mezza maratona', km: 21.097 },
   { id: '42k', label: 'Maratona', km: 42.195 }, { id: 'trail', label: 'Trail', km: null }, { id: 'altro', label: 'Altra distanza', km: null },
 ]
 export const MIN_KM = 3, MAX_KM = 60
@@ -94,7 +94,7 @@ export function generatePlan(g: GoalInput): Generated {
   const buildN = Math.max(0, weeksN - rwWeeks.length - taper)
   const build = buildN >= ideal.length ? ideal : ramp(l0, peak, 0, buildN)
   const name = RACES.find(r => r.id === g.race)!.label
-  const label = g.raceName?.trim() || (g.race === 'trail' || g.race === 'altro' ? `${name} ${g.km} km` : name)
+  const label = g.race === 'forma' ? name : g.raceName?.trim() || (g.race === 'trail' || g.race === 'altro' ? `${name} ${g.km} km` : name)
 
   const weeks: Week[] = []
   const add = (phase: number, sessions: Session[], scarico = false) => weeks.push({ week: weeks.length + 1, phase, scarico, skippable: false, total: null, sessions, uid: `${g.id}-${weeks.length + 1}` })
@@ -135,10 +135,10 @@ export function generatePlan(g: GoalInput): Generated {
   const ri = DAYS.indexOf(raceDay), easyRace = Math.max(3, half(lastEasy * .45))
   const before = days.filter(d => DAYS.indexOf(d) < ri - 1).slice(-2)
   add(4, [...before.map((day, i) => ({ day, km: easyRace, text: i === 0 && before.length > 1 ? `Facile ${easyRace} km + 4 allunghi 15"` : `Facile ${easyRace} km`, fiato: EASY, fatica: '2-3' })),
-    { day: raceDay, km: g.km, text: g.raceDate ? `Gara: ${label}` : `Obiettivo: ${label}`, fiato: 'Parti con calma', fatica: 'fino a 10', race: true }])
+    { day: raceDay, km: g.km, text: g.race === 'forma' ? `Prova finale ${g.km} km` : g.raceDate ? `Gara: ${label}` : `Obiettivo: ${label}`, fiato: g.race === 'forma' ? 'Frasi complete' : 'Parti con calma', fatica: g.race === 'forma' ? '4-5' : 'fino a 10', race: true }])
 
   const plan = normalizePlan({
-    meta: { kind: 'custom', id: g.id, name: `Piano ${label}`, strengthDays: g.strengthDays.filter(d => !days.includes(d)), phases: { '0': 'Ritorno alla corsa', '1': 'Base', '2': 'Costruzione', '3': 'Specifico', '4': 'Rifinitura' } },
+    meta: { kind: 'custom', id: g.id, name: g.race === 'forma' ? 'Stare in forma' : `Piano ${label}`, strengthDays: g.strengthDays.filter(d => !days.includes(d)), phases: { '0': 'Ritorno alla corsa', '1': 'Base', '2': 'Costruzione', '3': 'Specifico', '4': 'Rifinitura' } },
     weeks, maintenance: [],
   })
   const n = plan.weeks.length

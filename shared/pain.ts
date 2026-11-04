@@ -20,6 +20,8 @@ export function painsOf(a: { pains?: Pain[] | null; knee?: number | null }, knee
   if (a.pains) return a.pains
   return a.knee != null && a.knee > 0 ? [{ zone: kneeZone, level: a.knee }] : []
 }
+/** Le zone che la persona vuole sempre vedere: per l'amministratore resta il ginocchio finché non lo cambia. */
+export const watchedZones = (d: { state: { zones?: string[] | null }; me?: { isAdmin: boolean } }) => d.state.zones ?? (d.me?.isAdmin ? ['ginocchio'] : [])
 export const withPains = <T extends object>(a: T, pains: Pain[]) => ({ ...a, pains, knee: worstOf(pains) })
 /** Quante volte ogni zona ha dato dolore oltre la soglia, dalla più frequente. */
 export function zoneCounts(acts: { pains?: Pain[] | null; knee?: number | null }[], from = 1) {

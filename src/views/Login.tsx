@@ -31,7 +31,7 @@ export function Login({ setup, done }: { setup: boolean; done: () => void }) {
       {mode === 'setup' && <Field label="Codice di attivazione"><input value={code} onInput={e => setCode(e.currentTarget.value)} autocomplete="off" required /></Field>}
       {mode !== 'reset' && <Field label="Nome utente"><input value={name} onInput={e => setName(e.currentTarget.value)} autocomplete="username" autocapitalize="none" required /></Field>}
       <Field label={mode === 'login' ? 'Password' : 'Nuova password, almeno 10 caratteri'}><input type="password" value={pw} onInput={e => setPw(e.currentTarget.value)} autocomplete={mode === 'login' ? 'current-password' : 'new-password'} required /></Field>
-      {mode === 'invite' && <p class="sub">Dopo l'accesso scegli il piano base o ne crei uno per la tua gara. Nessun piano sostituisce il parere del medico.</p>}
+      {mode === 'invite' && <p class="sub">Dopo l'accesso scegli il tuo percorso e il tuo obiettivo. Nessun piano sostituisce il parere del medico.</p>}
       {err && <p class="err" role="alert">{err}</p>}
       <button class="btn" disabled={busy}>{cta}</button>
     </form>

@@ -15,8 +15,8 @@ export const MONTHS = [
 export const STRENGTH: Record<string, string> = {
   '0': '3×8-12 con due ripetizioni in riserva',
   '1': '3×8-12 con due ripetizioni in riserva',
-  '2': '3-4×6-8, più carico se il ginocchio resta asciutto',
-  '3': '3-4×6-8, più carico se il ginocchio resta asciutto',
+  '2': '3-4×6-8, più carico se non hai dolore né gonfiore',
+  '3': '3-4×6-8, più carico se non hai dolore né gonfiore',
   '3.5': '3×6-8, senza cedimento',
   '4': '2-3×6-8, senza cedimento',
 }
@@ -31,9 +31,7 @@ export const breathLevel = (s?: string | null) => {
 }
 export const WEEKDAY = { lun: 'Lunedì', mar: 'Martedì', mer: 'Mercoledì', gio: 'Giovedì', ven: 'Venerdì', sab: 'Sabato', dom: 'Domenica' } as const
 export const dayList = (l: (keyof typeof WEEKDAY)[]) => l.map(d => WEEKDAY[d].toLowerCase()).join(' e ')
-/** Le parole del piano base parlano del ginocchio di Roberto; quelle del piano personale restano generali. */
-export const painWords = (custom: boolean) => custom
-  ? { pain: 'Dolore', chart: 'Dolore durante la corsa', locked: 'Ho dovuto fermarmi per il dolore', askTitle: 'Come stai stamattina?', ask: 'Dopo la corsa di ieri hai gonfiore a una gamba o a un piede?', yes: 'Sì, ho gonfiore', stop: 'Dolore che ferma la corsa: stop.', stopText: 'Non correre finché non hai capito cosa è successo. Se non passa, senti il medico.', warn: 'Dolore da rispettare.', warnText: 'Due giorni senza corsa, poi riparti da un passo indietro.' }
-  : { pain: 'Dolore al ginocchio', chart: 'Dolore al ginocchio', locked: 'Il ginocchio si è bloccato o ha ceduto', askTitle: 'Come sta il ginocchio stamattina?', ask: 'Dopo la corsa di ieri, è gonfio?', yes: 'Sì, è gonfio', stop: 'Ginocchio bloccato: stop corsa.', stopText: 'Non correre fino a una valutazione. Bici e nuoto solo se non danno dolore.', warn: 'Ginocchio da rispettare.', warnText: 'Stop corsa per 2 giorni, solo bici o nuoto, poi riparti da un passo indietro.' }
+/** Parole uguali per tutti: la zona del dolore la indica ogni persona. */
+export const PAIN = { pain: 'Dolore', chart: 'Dolore, valore più alto', locked: 'Ho dovuto fermarmi per il dolore o qualcosa ha ceduto', askTitle: 'Come stai stamattina?', ask: 'Dopo la corsa di ieri hai gonfiore a una gamba o a un piede?', yes: 'Sì, ho gonfiore', stop: 'Dolore che ferma la corsa: stop.', stopText: 'Non correre finché non hai capito cosa è successo. Se non passa, senti il medico. Bici e nuoto solo se non danno dolore.', warn: 'Dolore da rispettare.', warnText: 'Due giorni senza corsa, solo bici o nuoto se non danno dolore, poi riparti da un passo indietro.' }
 export const fmtDate = (iso: string, opt: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long' }) => new Intl.DateTimeFormat('it-IT', { timeZone: 'UTC', ...opt }).format(new Date(iso + 'T12:00:00Z'))
 export const todayISO = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10) }

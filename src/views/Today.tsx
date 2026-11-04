@@ -45,7 +45,7 @@ export function Today() {
   const d = data.value!, plan = planFor(d), custom = isCustom(plan), t = buildTimeline(plan, d.state), today = todayISO()
   const first = t.slots[0], slot = slotForDate(t, today)
   const started = today >= first.monday
-  const [mn, temp, tip] = MONTHS[+today.slice(5, 7) - 1]
+  const [mn, , tip] = MONTHS[+today.slice(5, 7) - 1]
   const ses = slot?.sessions.find(x => sessionDate(slot, x.day) === today)
   const done = slot && ses ? d.activities.find(a => a.sessionKey === sessionKey(slot, ses.day)) : undefined
   // revisione settimana precedente
@@ -101,8 +101,8 @@ export function Today() {
         <li><a href="#/registra"><span><b>Registra un allenamento</b><small>A mano o da file FIT, GPX, TCX</small></span></a></li>
       </ul>
       <section class="panel quiet">
-        <h2>{mn} in zona Milano: {temp}</h2>
-        <p>{tip} Valori medi di Milano.</p>
+        <h2>Consiglio di {mn.toLowerCase()}</h2>
+        <p>{tip}</p>
       </section>
     </div>
   )

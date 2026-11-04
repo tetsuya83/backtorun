@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'preact/hooks'
 import { call, clearLocal, data, load, saveCustomPlan, saveState } from '../api'
 import { Field, Note } from '../ui'
 import { isCustom, moveRace, planFor, type Activity } from '../../shared/engine'
-import { painText } from '../../shared/pain'
+import { painText, watchedZones, ZONES } from '../../shared/pain'
 
 const save = (name: string, text: string, type: string) => { const u = URL.createObjectURL(new Blob([text], { type })); const a = document.createElement('a'); a.href = u; a.download = name; a.click(); URL.revokeObjectURL(u) }
 const CSV = ['date', 'type', 'source', 'km', 'seconds', 'hrAvg', 'hrMax', 'hrLast', 'splits', 'fiato', 'fatica', 'knee', 'pains', 'swelling', 'locked', 'note', 'sessionKey', 'cadence', 'ascent'] as const
@@ -69,16 +69,19 @@ export function Settings({ onLogout }: { onLogout: () => void }) {
     <div class="stack form">
       <section class="head"><h1>Profilo</h1></section>
       <h2 class="phase">Piano</h2>
-      <a class="btn ghost" href="#/mio-piano">{custom ? d.custom!.meta.name : 'Piano base'}: cambia o crea il tuo</a>
+      <a class="btn ghost" href="#/mio-piano">{custom ? d.custom!.meta.name : 'Maratona graduale'}: cambia percorso</a>
       <h2 class="phase">Calendario</h2>
       <Field label="Inizio del piano"><input type="date" value={st.startDate} onChange={e => saveState({ ...st, startDate: e.currentTarget.value })} /></Field>
       {!custom && <Field label="Settimana di partenza"><input type="number" min={1} max={34} value={st.startWeek} onChange={e => saveState({ ...st, startWeek: Math.min(34, Math.max(1, +e.currentTarget.value || 1)) })} /></Field>}
       <Heart />
+      <h2 class="phase">Zone da tenere d'occhio</h2>
+      <p class="sub pad">Compaiono sempre quando registri una corsa, così non devi aggiungerle ogni volta.</p>
+      <div class="chips">{ZONES.map(z => { const on = watchedZones(d).includes(z.id); return <button type="button" key={z.id} class={on ? 'sel' : ''} aria-pressed={on} onClick={() => saveState({ ...st, zones: on ? watchedZones(d).filter(x => x !== z.id) : [...watchedZones(d), z.id] })}>{z.label}</button> })}</div>
       <h2 class="phase">Orologio</h2>
       <Field label="Il tuo orologio"><select value={st.watch ?? ''} onChange={e => saveState({ ...st, watch: e.currentTarget.value || null })}><option value="">Nessuno: uso il GPS del telefono</option>{['Suunto', 'Garmin', 'Coros', 'Polar', 'Apple Watch', 'Altro'].map(x => <option key={x} value={x}>{x}</option>)}</select></Field>
       <p class="sub pad">Serve a scegliere come misurare la distanza negli allenamenti guidati. I dati si importano da file FIT, GPX o TCX, di qualsiasi marca.</p>
       <h2 class="phase">Gara</h2>
-      <Field label={custom ? 'Data della gara' : 'Data della maratona'}><input type="date" value={st.raceDate ?? ''} onChange={e => {
+      <Field label={'Data della gara'}><input type="date" value={st.raceDate ?? ''} onChange={e => {
         const v = e.currentTarget.value || null
         if (!custom) { saveState({ ...st, raceDate: v }); return }
         const m = moveRace(d.custom!, st, v); saveCustomPlan(m.plan); saveState(m.state)

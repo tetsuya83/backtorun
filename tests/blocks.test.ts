@@ -168,3 +168,18 @@ describe('nuoto', () => {
   })
   it('i modelli sono validi', () => { for (const t of SWIM_TEMPLATES) expect(blocksError(t.blocks())).toBeNull() })
 })
+describe('percorsi', () => {
+  const base = { id: 'x', raceName: '', raceDate: null, days: ['mar', 'gio', 'dom'] as Day[], longDay: 'dom' as Day, strengthDays: [], startDate: '2026-11-09' }
+  const paths = [[0, 0, 'finire'], [0, 1, 'finire'], [15, 8, 'finire'], [25, 12, 'migliorare']] as const
+  it('ogni partenza con ogni obiettivo produce un piano valido e guidabile', () => {
+    for (const [weeklyKm, longestKm, ambition] of paths) for (const [race, km] of [['forma', 10], ['5k', 5], ['10k', 10], ['21k', 21.097], ['42k', 42.195], ['trail', 30], ['altro', 15]] as const) {
+      const r = generatePlan({ ...base, race, km, weeklyKm, longestKm, ambition })
+      expect(r.blocked).toBe(false); expect(planError(r.plan)).toBeNull()
+      for (const s of r.plan.weeks.flatMap(x => x.sessions)) expect(blocksOf(s), s.text).not.toBeNull()
+    }
+  })
+  it('stare in forma finisce con una prova, non con una gara', () => {
+    const r = generatePlan({ ...base, race: 'forma', km: 10, weeklyKm: 0, longestKm: 0, ambition: 'finire' })
+    expect(r.plan.meta.name).toBe('Stare in forma'); expect(r.plan.weeks.at(-1)!.sessions.at(-1)!.text).toBe('Prova finale 10 km')
+  })
+})

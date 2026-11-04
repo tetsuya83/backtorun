@@ -7,7 +7,7 @@ export const HELP: HelpSection[] = [
     { q: "Cos'è BackToRun", a: ["È un'app per prepararti alla corsa: ti dice cosa fare ogni giorno, ti guida durante l'allenamento e tiene traccia di come stai andando."] },
     { q: 'Come la installo sul telefono', a: ["Apri l'indirizzo dell'app con Chrome su Android e scegli l'installazione dal menu del browser.", "Dopo l'installazione chiudila e riaprila una volta: da quel momento funziona anche senza rete."] },
     { q: 'Come mi muovo nell\'app', a: ['In basso trovi sempre cinque voci: Home, Allenati, Consulta, Impara e Profilo.', 'Il logo in alto a sinistra riporta alla Home.'] },
-    { q: 'Quale piano scelgo', a: ['Puoi usare il piano base, creare un piano per la tua gara oppure scrivere la tua tabella. Se cambi piano, gli allenamenti registrati restano.'], to: ['mio-piano', 'Apri Il mio piano'] },
+    { q: 'Come scelgo il percorso', a: ['Al primo accesso indichi da dove parti e il tuo obiettivo: dal 5 km alla maratona, trail, una distanza a scelta o semplicemente stare in forma. Il piano si costruisce su di te.', 'In alternativa puoi scegliere la Maratona graduale, un percorso pronto di 50 settimane, oppure scrivere la tua tabella. Se cambi percorso, gli allenamenti registrati restano.'], to: ['mio-piano', 'Apri Il mio piano'] },
   ] },
   { id: 'home', title: 'Home', items: [
     { q: 'Cosa mostra', a: ['La seduta di oggi, con un pulsante per partire subito, e gli avvisi sul corpo se hai segnalato dolori o un blocco.', 'Se la seduta ha più blocchi, vedi anche il suo schema: la larghezza indica la durata stimata e l\'altezza l\'intensità.'] },
@@ -27,19 +27,20 @@ export const HELP: HelpSection[] = [
   { id: 'registra', title: 'Registrare', items: [
     { q: 'Registrare a mano', a: ['Indica tipo di attività, data, distanza, durata, fatica e, se vuoi, frequenza cardiaca e note. Per la corsa la fatica è obbligatoria, perché decide come proseguire.'], to: ['registra', 'Registra un allenamento'] },
     { q: 'Importare dall\'orologio', a: ['Esporta il file dall\'app del tuo orologio o da Strava e caricalo con Carica file. Sono accettati FIT, GPX, TCX e i file .gz degli archivi Strava, per corsa, bici e nuoto.', 'Su Android puoi anche usare Condividi sul file e scegliere BackToRun.', 'Se la data coincide con una corsa del piano, l\'allenamento si collega da solo alla seduta.'] },
-    { q: 'Segnalare i dolori', a: ['Con Aggiungi una zona scegli una o più parti del corpo. Per ognuna indichi intensità da 0 a 10, lato e momento in cui è comparso il dolore.', 'Nel piano base il ginocchio è sempre presente. Le regole di sicurezza usano il valore più alto tra tutte le zone.', 'L\'app non fa diagnosi: se un dolore torna o peggiora, fatti visitare.'] },
+    { q: 'Segnalare i dolori', a: ['Con Aggiungi una zona scegli una o più parti del corpo. Per ognuna indichi intensità da 0 a 10, lato e momento in cui è comparso il dolore.', 'Se in Profilo scegli le zone da tenere d\'occhio, compaiono sempre quando registri una corsa. Le regole di sicurezza usano il valore più alto tra tutte le zone.', 'L\'app non fa diagnosi: se un dolore torna o peggiora, fatti visitare.'] },
   ] },
   { id: 'consulta', title: 'Consultare', items: [
     { q: 'Il piano', a: ['Mostra tutte le settimane divise per fase. Da ogni seduta puoi avviare la guida, registrare o leggere cos\'è quel lavoro.', 'Puoi ripetere una settimana, e saltare quelle indicate come saltabili: il calendario si aggiorna da solo.'], to: ['piano', 'Apri il piano'] },
     { q: 'Andamento', a: ['Raccoglie km fatti e previsti, carico, fatica, dolori, zone che tornano più spesso ed efficienza. Dal dettaglio di una corsa vedi anche grafici e intertempi, se ci sono i dati.'], to: ['andamento', 'Apri Andamento'] },
-    { q: 'Il test della Scala', a: ['Sono cinque round di corsa facile, sempre più lunghi. Nel piano base il risultato indica da quale settimana partire; nei piani personali serve solo a misurarti.'], to: ['test', 'Apri il test'] },
-    { q: 'Creare o modificare un piano', a: ['Per creare un piano indichi gara, data, livello attuale e giorni disponibili. L\'app avvisa se la data è troppo vicina.', 'In un piano personale puoi modificare ogni seduta con il wizard o scriverla a mano, duplicare le settimane e copiarle in quelle vuote.'], to: ['mio-piano', 'Apri Il mio piano'] },
+    { q: 'Il test della Scala', a: ['Sono cinque round di corsa facile, sempre più lunghi. Nella Maratona graduale il risultato indica da quale settimana partire; negli altri percorsi serve solo a misurarti.'], to: ['test', 'Apri il test'] },
+    { q: 'Creare o modificare un piano', a: ['Per creare un percorso indichi da dove parti, obiettivo, data se c\'è una gara e giorni disponibili. L\'app avvisa se la data è troppo vicina.', 'In un piano personale puoi modificare ogni seduta con il wizard o scriverla a mano, duplicare le settimane e copiarle in quelle vuote.'], to: ['mio-piano', 'Apri Il mio piano'] },
   ] },
   { id: 'impara', title: 'Impara', items: [
     { q: 'Cosa trovi', a: ['Schede su tipi di allenamento, esercizi di forza e mobilità: a cosa servono, quando farli, come si eseguono ed errori comuni. Molte hanno un\'illustrazione e le fonti.', 'Puoi cercare per nome. Le illustrazioni funzionano anche offline: negli esercizi vedi la posizione iniziale e quella finale.'], to: ['impara', 'Apri Impara'] },
   ] },
   { id: 'profilo', title: 'Profilo', items: [
     { q: 'Calendario e gara', a: ['Puoi cambiare inizio del piano, settimana di partenza, data e nome della gara. Nei piani personali, se sposti la gara si sposta tutto il calendario.'], to: ['impostazioni', 'Apri Profilo'] },
+    { q: 'Zone da tenere d\'occhio', a: ['Scegli le parti del corpo che vuoi controllare a ogni corsa: compariranno da sole nella registrazione.'] },
     { q: 'Frequenza cardiaca e orologio', a: ['Con la FC massima l\'app calcola le zone e mostra i battiti durante la guida. Il valore più affidabile viene da un test o da una gara corta, non da una formula per età.', 'L\'orologio serve a scegliere come misurare la distanza negli allenamenti guidati.'] },
     { q: 'Backup', a: ['Scarica un backup una volta al mese. Il file JSON si può ripristinare; il CSV serve per consultare i dati in un foglio di calcolo.'] },
     { q: 'Invitare altre persone', a: ['Solo l\'amministratore vede la sezione Persone. Ogni invito vale una volta per 7 giorni, fino a 10 persone in tutto. Da lì puoi anche creare un link per una nuova password o eliminare un profilo.', 'Ognuno vede nell\'app solo i propri dati.'] },

@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { data, deleteActivity, saveActivity, uid } from '../api'
 import { buildTimeline, isCustom, planFor, sessionDate, sessionKey, type Activity } from '../../shared/engine'
-import { fmtDate, painWords, todayISO, WEEKDAY } from '../guide'
+import { fmtDate, PAIN as words, todayISO, WEEKDAY } from '../guide'
 import { breathHint, Field, Gauge, nav, Note, Scale } from '../ui'
 import { paceOf, parseActivityFile, timeOf, type FitResult } from '../fit'
-import { painsOf, withPains, type Pain } from '../../shared/pain'
+import { painsOf, watchedZones, withPains, type Pain } from '../../shared/pain'
 import { PainPicker } from './Pain'
 import { RESULT, type GuideResult } from './Guide'
 import { local } from '../sound'
@@ -16,7 +16,7 @@ const num = (v: string) => v === '' ? null : +v.replace(',', '.')
 
 export function Log({ route }: { route: string }) {
   const d = data.value!, q = new URLSearchParams(route.split('?')[1] ?? '')
-  const plan = planFor(d), custom = isCustom(plan), words = painWords(custom)
+  const plan = planFor(d), custom = isCustom(plan)
   const t = useMemo(() => buildTimeline(plan, d.state), [plan, d.state])
   const existing = d.activities.find(a => a.id === q.get('id'))
   const blank = (): Activity => {
@@ -25,9 +25,9 @@ export function Log({ route }: { route: string }) {
   }
   const [a, setA] = useState<Activity>(() => existing ?? blank())
   const [dur, setDur] = useState(fromSec(existing?.seconds ?? a.seconds ?? (q.get('sec') ? +q.get('sec')! : null)))
-  const must = !custom && a.type === 'corsa' ? 'ginocchio' : undefined
+  const must = a.type === 'corsa' ? watchedZones(d) : []
   const [pains, setPains] = useState<Pain[]>(() => painsOf(a, custom ? 'altro' : 'ginocchio'))
-  const shown = must && !pains.some(p => p.zone === must) ? [{ zone: must, level: a.knee ?? 0 }, ...pains] : pains
+  const shown = [...must.filter(z => !pains.some(p => p.zone === z)).map(zone => ({ zone, level: 0 })), ...pains]
   const [msg, setMsg] = useState(''), [err, setErr] = useState(''), [saved, setSaved] = useState(false)
   const file = useRef<HTMLInputElement>(null)
   const up = (p: Partial<Activity>) => setA(x => ({ ...x, ...p }))
