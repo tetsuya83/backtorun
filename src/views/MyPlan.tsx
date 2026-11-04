@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'preact/hooks'
 import { data, saveCustomPlan, saveState, startCustomPlan, uid, switchPlan } from '../api'
-import { addDays, DAYS, mondayOf, planError, type Day, type Plan, type Session, type Week } from '../../shared/engine'
+import { addDays, DAYS, mondayOf, mustChoose, planError, type Day, type Plan, type Session, type Week } from '../../shared/engine'
 import { blankPlan, generatePlan, MAX_KM, MIN_KM, RACES, type GoalInput, type RaceType } from '../../shared/generator'
 import { fmtDate, todayISO, WEEKDAY } from '../guide'
 import { BlockList, Field, nav, Note } from '../ui'
@@ -20,7 +20,7 @@ export function DayPicker({ label, value, onChange, disabled = [] }: { label: st
 
 /** Il percorso: si sceglie al primo accesso e si può cambiare quando si vuole. */
 export function MyPlan() {
-  const d = data.value!, mode = d.state.mode === 'custom' && d.custom ? 'custom' : 'base', first = !d.state.mode
+  const d = data.value!, mode = d.state.mode === 'custom' && d.custom ? 'custom' : 'base', first = mustChoose(d)
   const pick = (m: 'base' | 'custom') => { switchPlan(m); nav('home') }
   const replace = (e: Event) => { if (d.custom && !confirm('Il nuovo piano sostituirà quello attuale. Gli allenamenti registrati restano.')) e.preventDefault() }
   return (

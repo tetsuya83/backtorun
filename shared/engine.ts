@@ -60,6 +60,8 @@ export function buildTimeline(plan: Plan, st: State): Timeline {
 }
 export const plannedOn = (st: State, date: string) => (st.planned ?? []).filter(p => p.date === date && p.mode === 'add')
 export const plannedKey = (p: { id: string }) => `p-${p.id}`
+/** La scelta del percorso si chiede solo a chi non ne ha una: l'amministratore esistente resta sul suo piano. */
+export const mustChoose = (d: { state: { mode?: string | null }; me?: { isAdmin: boolean } }) => !d.state.mode && !d.me?.isAdmin
 export const MAX_WORKOUTS = 100
 /** Restituisce il problema dell'allenamento, oppure null se va bene. */
 export function workoutError(w: any): string | null {

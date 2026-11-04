@@ -183,3 +183,12 @@ describe('percorsi', () => {
     expect(r.plan.meta.name).toBe('Stare in forma'); expect(r.plan.weeks.at(-1)!.sessions.at(-1)!.text).toBe('Prova finale 10 km')
   })
 })
+import { mustChoose } from '../shared/engine'
+describe('scelta del percorso', () => {
+  it('solo chi non ha ancora scelto, mai gli account già configurati', () => {
+    expect(mustChoose({ state: {}, me: { isAdmin: false } })).toBe(true)
+    expect(mustChoose({ state: {}, me: { isAdmin: true } })).toBe(false)
+    expect(mustChoose({ state: { mode: 'base' }, me: { isAdmin: false } })).toBe(false)
+    expect(mustChoose({ state: { mode: 'custom' }, me: { isAdmin: false } })).toBe(false)
+  })
+})

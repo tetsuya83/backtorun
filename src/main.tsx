@@ -21,6 +21,7 @@ import { Workouts } from './views/Workouts'
 import { FREE, GuideView } from './views/Guide'
 import { Builder } from './views/Builder'
 import { local } from './sound'
+import { mustChoose } from '../shared/engine'
 
 const TABS = [
   ['home', 'Home', 'M4 11l8-7 8 7v9h-5v-6H9v6H4z', ['home', 'aiuto']],
@@ -56,7 +57,7 @@ function App() {
   if (!data.value) return null
   const asked = route.split('?')[0]
   // chi arriva su invito sceglie il piano al primo accesso
-  const base = !data.value.state.mode && !asked.startsWith('mio-piano') && asked !== 'aiuto' ? 'mio-piano' : asked
+  const base = mustChoose(data.value) && !asked.startsWith('mio-piano') && asked !== 'aiuto' ? 'mio-piano' : asked
   return (
     <div class="app">
       <header class="top">
