@@ -6,6 +6,17 @@ Numerazione: il numero centrale cresce quando cambia una funzione, l'ultimo quan
 
 Le sezioni ammesse in ogni versione sono Aggiunto, Modificato e Tolto.
 
+## 1.17.0 - 2026-11-05
+
+### Aggiunto
+
+- Importazione automatica degli allenamenti dall'orologio tramite Intervals.icu, con chiave personale da inserire in Profilo.
+- Scheda in Home con i nuovi allenamenti da importare o ignorare, controllata a ogni apertura dell'app.
+
+### Modificato
+
+- Una seduta già registrata a mano o col GPS del telefono si completa con i dati dell'orologio, senza perdere fatica e dolori.
+
 ## 1.16.0 - 2026-11-05
 
 ### Aggiunto

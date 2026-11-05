@@ -2,8 +2,9 @@ import { Hono } from 'hono'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 import planData from '../shared/plan.json'
 import { defaultState, MAX_WORKOUTS, planError, workoutError } from '../shared/engine'
+import { isStrava, remoteOf } from '../shared/intervals'
 
-type Env = { Bindings: { DB: D1Database; SETUP_CODE?: string }; Variables: { uid: number } }
+type Env = { Bindings: { DB: D1Database; SETUP_CODE?: string; INTERVALS_URL?: string }; Variables: { uid: number } }
 const app = new Hono<Env>()
 const COOKIE = 'btr_session'
 const ITER = 10000 // basso di proposito: il piano gratuito concede 10 ms di CPU per richiesta
@@ -20,6 +21,7 @@ const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS idx_act_date ON activities (user_id, date)`,
   `CREATE TABLE IF NOT EXISTS invites (code_hash TEXT PRIMARY KEY, user_id INTEGER, expires_at INTEGER NOT NULL, used_at INTEGER)`,
   `CREATE TABLE IF NOT EXISTS workouts (id TEXT NOT NULL, user_id INTEGER NOT NULL, json TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY (user_id, id))`,
+  `CREATE TABLE IF NOT EXISTS intervals (user_id INTEGER PRIMARY KEY, api_key TEXT NOT NULL, connected_at INTEGER NOT NULL, skipped TEXT NOT NULL DEFAULT '[]')`,
   `CREATE TABLE IF NOT EXISTS tests (id TEXT NOT NULL, user_id INTEGER NOT NULL, date TEXT NOT NULL, kind TEXT NOT NULL, json TEXT NOT NULL, PRIMARY KEY (user_id, id))`,
 ]
 const MAX_USERS = 10
@@ -146,7 +148,7 @@ const auth = async (c: any, next: any) => {
   if (!s) return c.json({ error: 'Sessione scaduta. Accedi di nuovo.' }, 401)
   c.set('uid', s.user_id); await next()
 }
-for (const p of ['/api/bootstrap', '/api/state', '/api/custom-plan', '/api/activities/*', '/api/tests/*', '/api/workouts/*', '/api/import', '/api/admin/*']) app.use(p, auth)
+for (const p of ['/api/bootstrap', '/api/state', '/api/custom-plan', '/api/activities/*', '/api/tests/*', '/api/workouts/*', '/api/import', '/api/intervals/*', '/api/admin/*']) app.use(p, auth)
 app.use('/api/admin/*', async (c, next) => {
   const u = await c.env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(c.get('uid')).first<{ is_admin: number }>()
   if (!u?.is_admin) return c.json({ error: 'Riservato all\'amministratore.' }, 403)
@@ -172,12 +174,12 @@ app.post('/api/admin/invites', async c => {
 app.delete('/api/admin/users/:id', async c => {
   const id = +c.req.param('id'), db = c.env.DB
   if (id === c.get('uid')) return c.json({ error: 'Non puoi eliminare il tuo account.' }, 400)
-  await db.batch(['sessions', 'state', 'user_plans', 'activities', 'tests', 'workouts', 'invites'].map(t => db.prepare(`DELETE FROM ${t} WHERE user_id = ?`).bind(id)).concat(db.prepare('DELETE FROM users WHERE id = ?').bind(id)))
+  await db.batch(['sessions', 'state', 'user_plans', 'activities', 'tests', 'workouts', 'invites', 'intervals'].map(t => db.prepare(`DELETE FROM ${t} WHERE user_id = ?`).bind(id)).concat(db.prepare('DELETE FROM users WHERE id = ?').bind(id)))
   return c.json({ ok: true })
 })
 
 const dump = async (db: D1Database, uid: number) => {
-  const [p, s, a, t, u, x, w] = await db.batch<any>([
+  const [p, s, a, t, u, x, w, k] = await db.batch<any>([
     db.prepare('SELECT json FROM plan WHERE id = 1'),
     db.prepare('SELECT json FROM state WHERE user_id = ?').bind(uid),
     db.prepare('SELECT json FROM activities WHERE user_id = ? ORDER BY date').bind(uid),
@@ -185,6 +187,7 @@ const dump = async (db: D1Database, uid: number) => {
     db.prepare('SELECT name, is_admin FROM users WHERE id = ?').bind(uid),
     db.prepare('SELECT json FROM user_plans WHERE user_id = ?').bind(uid),
     db.prepare('SELECT json FROM workouts WHERE user_id = ? ORDER BY updated_at DESC').bind(uid),
+    db.prepare('SELECT 1 ok FROM intervals WHERE user_id = ?').bind(uid),
   ])
   return {
     plan: JSON.parse(p.results[0].json),
@@ -193,7 +196,7 @@ const dump = async (db: D1Database, uid: number) => {
     activities: a.results.map((r: any) => JSON.parse(r.json)),
     tests: t.results.map((r: any) => JSON.parse(r.json)),
     workouts: w.results.map((r: any) => JSON.parse(r.json)),
-    me: { name: u.results[0]?.name, isAdmin: !!u.results[0]?.is_admin },
+    me: { name: u.results[0]?.name, isAdmin: !!u.results[0]?.is_admin, intervals: !!k.results[0] },
   }
 }
 app.get('/api/bootstrap', async c => c.json(await dump(c.env.DB, c.get('uid'))))
@@ -231,6 +234,52 @@ app.post('/api/import', async c => {
   const stm = [putState(db, uid, d.state), ...(d.workouts ?? []).map((w: any) => putWorkout(db, uid, w)), ...(d.custom ? [putPlan(db, uid, d.custom)] : []), ...d.activities.map((a: any) => putAct(db, uid, a)), ...(d.tests ?? []).map((t: any) => putTest(db, uid, t))]
   for (let i = 0; i < stm.length; i += 50) await db.batch(stm.slice(i, i + 50))
   return c.json({ ok: true, imported: d.activities.length })
+})
+// Intervals.icu: la chiave sta solo qui e non viene mai restituita al telefono.
+const DAY = 864e5
+const isoDay = (ms: number) => new Date(ms).toISOString().slice(0, 10)
+const intervals = (c: any, key: string, path: string) => fetch(`${c.env.INTERVALS_URL ?? 'https://intervals.icu'}/api/v1${path}`, { headers: { authorization: 'Basic ' + btoa('API_KEY:' + key), 'user-agent': 'Mozilla/5.0 (compatible; BackToRun)' } })
+const linkOf = (c: any) => c.env.DB.prepare('SELECT api_key key, connected_at at, skipped FROM intervals WHERE user_id = ?').bind(c.get('uid')).first() as Promise<{ key: string; at: number; skipped: string } | null>
+async function remoteList(c: any, key: string, since: number) {
+  let r: Response
+  try { r = await intervals(c, key, `/athlete/0/activities?oldest=${isoDay(since)}&newest=${isoDay(Date.now() + DAY)}`) }
+  catch { return { error: 'Intervals.icu non risponde. Riprova più tardi.', status: 502 as const } }
+  if (r.status === 401 || r.status === 403) return { error: 'Intervals.icu non accetta questa chiave. Controllala nelle sue impostazioni.', status: 400 as const }
+  const raw = r.ok ? await r.json().catch(() => null) : null
+  if (!Array.isArray(raw)) return { error: 'Intervals.icu non risponde. Riprova più tardi.', status: 502 as const }
+  return { items: raw.map(remoteOf).filter(x => x != null), strava: raw.filter(isStrava).length }
+}
+app.put('/api/intervals/key', async c => {
+  const key = String((await c.req.json<any>()).key ?? '').trim()
+  if (!/^[\w-]{8,120}$/.test(key)) return c.json({ error: 'Questa non sembra una chiave di Intervals.icu.' }, 400)
+  const r = await remoteList(c, key, Date.now() - DAY)
+  if ('error' in r) return c.json({ error: r.error }, r.status)
+  await c.env.DB.prepare("INSERT INTO intervals VALUES (?, ?, ?, '[]') ON CONFLICT(user_id) DO UPDATE SET api_key = excluded.api_key, connected_at = excluded.connected_at, skipped = '[]'").bind(c.get('uid'), key, Date.now()).run()
+  return c.json({ ok: true })
+})
+app.delete('/api/intervals/key', async c => { await c.env.DB.prepare('DELETE FROM intervals WHERE user_id = ?').bind(c.get('uid')).run(); return c.json({ ok: true }) })
+app.get('/api/intervals/new', async c => {
+  const l = await linkOf(c)
+  if (!l) return c.json({ items: [], strava: 0 })
+  // si guarda poco prima del collegamento e al massimo due settimane indietro, così lo storico non invade la Home
+  const r = await remoteList(c, l.key, Math.max(l.at - 2 * DAY, Date.now() - 14 * DAY))
+  if ('error' in r) return c.json({ error: r.error }, r.status)
+  const skip = new Set<string>(JSON.parse(l.skipped))
+  return c.json({ items: r.items.filter(x => !skip.has(x.id)), strava: r.strava })
+})
+app.get('/api/intervals/file/:id', async c => {
+  const l = await linkOf(c), id = c.req.param('id')
+  if (!l || !/^[\w-]{1,40}$/.test(id)) return c.json({ error: 'Allenamento non trovato.' }, 404)
+  const r = await intervals(c, l.key, `/activity/${id}/file`).catch(() => null)
+  if (!r?.ok || !r.body) return c.json({ error: 'File non disponibile.' }, 404)
+  return new Response(r.body, { headers: { 'content-type': 'application/octet-stream' } })
+})
+app.post('/api/intervals/skip/:id', async c => {
+  const l = await linkOf(c)
+  if (!l) return c.json({ ok: true })
+  const list: string[] = JSON.parse(l.skipped), id = c.req.param('id')
+  if (!list.includes(id)) await c.env.DB.prepare('UPDATE intervals SET skipped = ? WHERE user_id = ?').bind(JSON.stringify([...list, id].slice(-200)), c.get('uid')).run()
+  return c.json({ ok: true })
 })
 app.notFound(c => c.json({ error: 'Non trovato' }, 404))
 app.onError((e, c) => { console.error(e); return c.json({ error: 'Errore del server. Riprova.' }, 500) })

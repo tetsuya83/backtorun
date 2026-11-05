@@ -14,7 +14,7 @@ export interface PlanMeta { phases: Record<string, string>; kind?: 'custom'; id?
 export interface Plan { meta: PlanMeta; weeks: Week[]; maintenance: Week[] }
 export interface State { startDate: string; startWeek: number; skips: number[]; repeats: number[]; raceDate: string | null; raceName?: string | null; mode?: 'base' | 'custom'; hrMax?: number | null; watch?: string | null; zones?: string[] | null; weather?: WeatherPrefs | null; planned?: Planned[]; restart?: boolean; round?: number; other?: Partial<State> | null }
 export interface Activity {
-  id: string; date: string; type: 'corsa' | 'forza' | 'nuoto' | 'bici' | 'altro'; sessionKey?: string | null; source: 'manuale' | 'fit' | 'gpx' | 'tcx' | 'gps'
+  id: string; date: string; type: 'corsa' | 'forza' | 'nuoto' | 'bici' | 'altro'; sessionKey?: string | null; source: 'manuale' | 'fit' | 'gpx' | 'tcx' | 'gps' | 'intervals'; externalId?: string | null
   km?: number | null; seconds?: number | null; hrAvg?: number | null; hrMax?: number | null; hrLast?: number | null
   splits?: string | null; fiato?: number | null; fatica?: number | null; knee?: number | null; swelling?: boolean | null; locked?: boolean | null
   note?: string | null; trace?: [number, number | null, number | null, (number | null)?, (number | null)?][] | null; cadence?: number | null; ascent?: number | null; sets?: ExerciseLog[] | null; updatedAt?: number; pains?: Pain[] | null; guide?: Lap[] | null

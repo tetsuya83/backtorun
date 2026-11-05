@@ -18,7 +18,7 @@ Il database `backtorun-db` esiste già su Cloudflare e il suo ID è in `wrangler
 6. Apri l'indirizzo `workers.dev` con Chrome su Android, crea nome utente e password e installa l'app dal menu.
 7. Chiudi e riapri l'app una volta: da quel momento funziona anche senza rete.
 
-Dopo l'installazione, nell'app del tuo orologio puoi usare **Condividi** su un file FIT, GPX o TCX e scegliere BackToRun.
+Dopo l'installazione, nell'app del tuo orologio puoi usare **Condividi** su un file FIT, GPX o TCX e scegliere BackToRun. In alternativa, ogni persona può inserire in Profilo la propria chiave di Intervals.icu per ricevere in Home i nuovi allenamenti.
 
 ## Persone
 

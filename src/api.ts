@@ -1,9 +1,11 @@
 import { signal } from '@preact/signals'
 import { defaultState, normalizePlan, type Activity, type Plan, type Planned, type State, type Workout } from '../shared/engine'
+import type { Remote } from '../shared/intervals'
 export interface TestRec { id: string; date: string; kind: string; data: any }
-export interface Data { plan: Plan; custom?: Plan | null; state: State; activities: Activity[]; tests: TestRec[]; workouts?: Workout[]; me?: { name: string; isAdmin: boolean } }
+export interface Data { plan: Plan; custom?: Plan | null; state: State; activities: Activity[]; tests: TestRec[]; workouts?: Workout[]; me?: { name: string; isAdmin: boolean; intervals?: boolean } }
 export const data = signal<Data | null>(null)
 export const pending = signal(0)
+export const imports = signal<Remote[]>([])
 export const online = signal(typeof navigator === 'undefined' ? true : navigator.onLine)
 type Op = { method: string; url: string; body?: unknown }
 const store = {
@@ -50,10 +52,22 @@ export function saveActivity(a: Activity) {
   enqueue({ method: 'PUT', url: `/api/activities/${a.id}`, body: a })
 }
 export function deleteActivity(id: string) {
-  const d = data.value!
+  const d = data.value!, ext = d.activities.find(x => x.id === id)?.externalId
   commit({ ...d, activities: d.activities.filter(x => x.id !== id) })
   enqueue({ method: 'DELETE', url: `/api/activities/${id}` })
+  if (ext) skipImport(ext) // cancellato: non deve tornare come allenamento nuovo
 }
+let checked = 0
+/** Cerca i nuovi allenamenti: all'apertura al massimo ogni 3 minuti, sempre quando lo chiede la persona. */
+export async function checkImports(force = false) {
+  if (!data.value?.me?.intervals || (!force && Date.now() - checked < 18e4)) return
+  checked = Date.now()
+  const r = await call<{ items: Remote[]; strava: number }>('GET', '/api/intervals/new')
+  imports.value = r.items
+  return r
+}
+export function skipImport(id: string) { imports.value = imports.value.filter(x => x.id !== id); enqueue({ method: 'POST', url: `/api/intervals/skip/${id}` }) }
+export function setIntervalsLinked(on: boolean) { const d = data.value!; commit({ ...d, me: { ...d.me!, intervals: on } }); if (!on) imports.value = []; checked = 0 }
 export function saveState(s: State) { commit({ ...data.value!, state: s }); enqueue({ method: 'PUT', url: '/api/state', body: s }) }
 const core = ({ other, ...s }: State) => s
 const nextMonday = () => { const d = new Date(); d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7)); return new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10) }
@@ -99,5 +113,5 @@ export function saveTest(t: TestRec) {
   commit({ ...d, tests: [...d.tests.filter(x => x.id !== t.id), t] })
   enqueue({ method: 'PUT', url: `/api/tests/${t.id}`, body: t })
 }
-export const clearLocal = () => { try { localStorage.removeItem('btr-data'); localStorage.removeItem('btr-queue'); localStorage.removeItem('btr-weather') } catch { /* niente da fare */ } queue = []; pending.value = 0; data.value = null }
+export const clearLocal = () => { try { localStorage.removeItem('btr-data'); localStorage.removeItem('btr-queue'); localStorage.removeItem('btr-weather') } catch { /* niente da fare */ } queue = []; pending.value = 0; data.value = null; imports.value = []; checked = 0 }
 export const uid = () => crypto.randomUUID()

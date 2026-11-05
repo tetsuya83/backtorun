@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
-import { data, deleteActivity, saveActivity, uid } from '../api'
+import { data, deleteActivity, imports, saveActivity, uid } from '../api'
 import { buildTimeline, isCustom, planFor, sessionDate, sessionKey, type Activity } from '../../shared/engine'
 import { fmtDate, PAIN as words, todayISO, WEEKDAY } from '../guide'
 import { breathHint, Field, Gauge, nav, Note, Scale } from '../ui'
@@ -57,6 +57,23 @@ export function Log({ route }: { route: string }) {
         await c.delete('/shared.fit')
       }
       history.replaceState(null, '', location.pathname + location.hash)
+    })()
+  }, [])
+  useEffect(() => { // allenamento proposto in Home: file originale, oppure il riepilogo se il file manca
+    const id = q.get('intervals')
+    if (!id) return
+    const r = imports.value.find(x => x.id === id)
+    setMsg('Scarico l\'allenamento…')
+    void (async () => {
+      try {
+        const res = await fetch(`/api/intervals/file/${encodeURIComponent(id)}`, { credentials: 'same-origin' })
+        if (!res.ok) throw new Error('file')
+        const f = await parseActivityFile(await res.arrayBuffer())
+        applyFit({ ...f, type: r?.type ?? f.type, externalId: id }, r?.name || 'Allenamento')
+      } catch {
+        if (r) applyFit({ date: r.date, type: r.type, km: r.km, seconds: r.seconds, hrAvg: r.hrAvg, hrMax: r.hrMax, ascent: r.ascent, source: 'intervals', externalId: id, sport: '', laps: 0 }, 'Solo riepilogo, senza dettagli')
+        else { setMsg(''); setErr('Non riesco a scaricare l\'allenamento. Riprova dalla Home.') }
+      }
     })()
   }, [])
   const save = (e: Event) => {

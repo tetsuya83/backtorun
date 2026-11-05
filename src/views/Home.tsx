@@ -6,6 +6,7 @@ import { fmtDate, PAIN as words, STRENGTH, todayISO } from '../guide'
 import { BlockList, Note } from '../ui'
 import { History } from './Log'
 import { PlannedToday } from './Workouts'
+import { ImportCard } from './Import'
 import { WeatherCard } from './Weather'
 import { PlanTip } from './Tools'
 import { weekLabel } from './Today'
@@ -64,6 +65,7 @@ export function Home() {
   return <div class="stack">
     <section class="home-h"><p>{fmtDate(today)}</p><h1>{d.me?.name ? `Ciao ${name(d.me.name)}` : 'Ciao'}</h1><p>Cosa vuoi fare oggi?</p></section>
     <BodyAlerts />
+    <ImportCard />
     <WeekStrip />
     <section class="panel today-c">
       <div class="pill-row"><p class="eyebrow">{started && slot ? `Oggi · ${weekLabel(slot)}` : 'Oggi'}</p>{tone && <span class={'pill ' + tone.key}>{tone.label}</span>}</div>
