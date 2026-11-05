@@ -6,6 +6,17 @@ Numerazione: il numero centrale cresce quando cambia una funzione, l'ultimo quan
 
 Le sezioni ammesse in ogni versione sono Aggiunto, Modificato e Tolto.
 
+## 1.18.0 - 2026-11-05
+
+### Aggiunto
+
+- Versione per il browser del computer, con menu laterale e pagine principali su più colonne.
+
+### Modificato
+
+- Schede di Impara più leggibili: sezioni colorate, concetti chiave in grassetto e ritmi con il colore della zona.
+- Tutte le illustrazioni ridisegnate con proporzioni più realistiche.
+
 ## 1.17.0 - 2026-11-05
 
 ### Aggiunto

@@ -64,6 +64,7 @@ export function Home() {
   const started = today >= first.monday, tone = started && ses ? sessionTone(ses) : null
   return <div class="stack">
     <section class="home-h"><p>{fmtDate(today)}</p><h1>{d.me?.name ? `Ciao ${name(d.me.name)}` : 'Ciao'}</h1><p>Cosa vuoi fare oggi?</p></section>
+    <div class="cols"><div class="col">
     <BodyAlerts />
     <ImportCard />
     <WeekStrip />
@@ -77,6 +78,7 @@ export function Home() {
       {started && !slot && <><h2>Piano concluso</h2><a class="btn" href="#/mio-piano">Scegli il prossimo obiettivo</a></>}
     </section>
     <PlannedToday />
+    </div><div class="col">
     <WeatherCard />
     <PlanTip />
     <nav class="tiles" aria-label="Sezioni">
@@ -87,6 +89,7 @@ export function Home() {
     </nav>
     <a class="btn ghost" href="#/aiuto">Guida</a>
     <a class="version" href="#/novita" aria-label={`Versione ${APP_VERSION}: guarda le novità`}>Versione {APP_VERSION} · Novità</a>
+    </div></div>
   </div>
 }
 export function Consult() {

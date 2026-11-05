@@ -67,7 +67,7 @@ function App() {
           {(!online.value || pending.value > 0) && <span class="sync">{online.value ? 'Sincronizzo' : 'Offline'}{pending.value ? `, ${pending.value} in attesa` : ''}</span>}
         </div>
       </header>
-      <main>
+      <main class={'pg-' + base.split('/')[0]}>
         {base === 'home' && <Home />}
         {base === 'consulta' && <Consult />}
         {base === 'aiuto' && <Help />}
@@ -92,6 +92,7 @@ function App() {
         {base === 'impostazioni' && <Settings onLogout={() => setAuth('login')} />}
       </main>
       <nav class="tabs">
+        <a class="tabs-logo" href="#/home" aria-label="Vai alla Home"><Logo small /></a>
         {TABS.map(([id, label, d, of]) => (
           <a key={id} href={'#/' + id} class={(of as readonly string[]).includes(base.split('/')[0]) ? 'active' : ''} aria-current={(of as readonly string[]).includes(base.split('/')[0]) ? 'page' : undefined}>
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d={d} /></svg>

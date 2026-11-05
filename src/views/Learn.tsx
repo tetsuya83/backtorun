@@ -1,25 +1,37 @@
 import { useEffect, useState } from 'preact/hooks'
 import { Illustration } from '../art'
 import { articleById, ARTICLES, GROUPS, SECTIONS, type Article } from '../learn'
-import { Note } from '../ui'
 import { FuelTool, WearTool } from './Tools'
 
-const Bullets = ({ title, l, bad }: { title: string; l: string[]; bad?: boolean }) => l.length ? <section class={bad ? 'panel bad' : 'panel'}><h2>{title}</h2><ul class="plain">{l.map(x => <li key={x}>{x}</li>)}</ul></section> : null
-const Steps = ({ title, l }: { title: string; l: string[] }) => l.length ? <section class="panel"><h2>{title}</h2><ol class="steps">{l.map(x => <li key={x}><span>{x}</span></li>)}</ol></section> : null
+/** Nei testi delle schede **testo** è il concetto chiave e ==ritmo facile== prende il colore della zona. */
+function Rich({ t }: { t: string }) {
+  return <>{t.split(/(\*\*[^*]+\*\*|==[^=]+==)/).filter(Boolean).map((x, i) => x.startsWith('**') ? <strong key={i}>{x.slice(2, -2)}</strong> : x.startsWith('==') ? <mark key={i} class={/facile/.test(x) ? 'z-easy' : /forte/.test(x) ? 'z-hard' : 'z-mid'}>{x.slice(2, -2)}</mark> : x)}</>
+}
+const ICONS = { star: 'M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17.1 6.6 20l1-6.1L3.2 9.5l6.1-.9z', clock: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3 2', check: 'M5 12l5 5 9-10', warn: 'M12 4l9 16H3zM12 10v4M12 17v.01' }
+const Ico = ({ d, c }: { d: string; c: string }) => <span class={'l-ic ' + c} aria-hidden="true"><svg viewBox="0 0 24 24"><path d={d} /></svg></span>
+const Why = ({ title, l }: { title: string; l: string[] }) => l.length ? <section class="panel l-sec"><h2><Ico d={ICONS.star} c="t-blue" />{title}</h2><ul class="dots">{l.map(x => <li key={x}><span><Rich t={x} /></span></li>)}</ul></section> : null
+const How = ({ title, l }: { title: string; l: string[] }) => l.length ? <section class="panel l-sec"><h2><Ico d={ICONS.check} c="t-green" />{title}</h2><ol class="nums">{l.map(x => <li key={x}><span><Rich t={x} /></span></li>)}</ol></section> : null
+const Errors = ({ l }: { l: string[] }) => l.length ? <section class="panel l-sec l-bad"><h2><Ico d={ICONS.warn} c="on-card" />Errori da evitare</h2><ul class="crosses">{l.map(x => <li key={x}><span><Rich t={x} /></span></li>)}</ul></section> : null
 function Sheet({ a }: { a: Article }) {
   const life = !['base', 'corsa', 'forza', 'mobilita'].includes(a.group)
-  return <div class="stack">
-    <section class="head"><p class="eyebrow"><a href="#/impara">{GROUPS.find(g => g[0] === a.group)?.[1] ?? 'Impara'}</a></p><h1>{a.title}</h1>{a.level && <p class={'level ' + (a.level.startsWith('Solo') ? 'ask' : 'ok')}>{a.level}</p>}<p>{a.what}</p></section>
-    {a.anim && <Illustration id={a.anim} />}
-    {a.tool === 'wear' && <WearTool />}
-    {a.tool === 'fuel' && <FuelTool />}
-    <Bullets title={life ? 'Perché conta' : a.group === 'mobilita' || a.group === 'forza' ? 'A cosa serve' : 'Utilità e vantaggi'} l={a.why} />
-    {a.when && <section class="panel"><h2>{life ? 'Quando serve' : 'Quando farlo'}</h2><p>{a.when}</p></section>}
-    <Steps title={life ? 'Cosa fare' : 'Come si fa'} l={a.how} />
-    <Bullets title="Errori da evitare" l={a.errors} bad />
-    {a.care && <Note>{a.care}</Note>}
-    {!!a.sources?.length && <section class="panel quiet"><h2>Fonti</h2><ul class="plain src">{a.sources.map(s => <li key={s.url}><a href={s.url} target="_blank" rel="noopener">{s.title}</a></li>)}</ul></section>}
-    <a class="btn ghost" href="#/impara">Tutte le schede</a>
+  return <div class="stack sheet">
+    <section class="head"><p class="eyebrow"><a href="#/impara">{GROUPS.find(g => g[0] === a.group)?.[1] ?? 'Impara'}</a></p><h1>{a.title}</h1>{a.level && <p class={'level ' + (a.level.startsWith('Solo') ? 'ask' : 'ok')}>{a.level}</p>}<p class="lead"><Rich t={a.what} /></p></section>
+    <div class="cols">
+      <div class="col">
+        {a.anim && <Illustration id={a.anim} />}
+        {a.tool === 'wear' && <WearTool />}
+        {a.tool === 'fuel' && <FuelTool />}
+        <Why title={life ? 'Perché conta' : a.group === 'mobilita' || a.group === 'forza' ? 'A cosa serve' : 'Utilità e vantaggi'} l={a.why} />
+        {a.when && <section class="l-when"><Ico d={ICONS.clock} c="on-card" /><div><h2>{life ? 'Quando serve' : 'Quando farlo'}</h2><p><Rich t={a.when} /></p></div></section>}
+      </div>
+      <div class="col">
+        <How title={life ? 'Cosa fare' : 'Come si fa'} l={a.how} />
+        <Errors l={a.errors} />
+        {a.care && <div class="l-care"><Rich t={a.care} /></div>}
+        {!!a.sources?.length && <section class="l-src"><h2>Fonti</h2><ul>{a.sources.map(s => <li key={s.url}><a href={s.url} target="_blank" rel="noopener">{s.title}</a></li>)}</ul></section>}
+        <a class="btn ghost" href="#/impara">Tutte le schede</a>
+      </div>
+    </div>
   </div>
 }
 export function Learn({ route }: { route: string }) {
