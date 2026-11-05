@@ -21,12 +21,13 @@ import { News } from './views/News'
 import { Workouts } from './views/Workouts'
 import { FREE, GuideView } from './views/Guide'
 import { Builder } from './views/Builder'
+import { Routes } from './views/Routes'
 import { local } from './sound'
 import { mustChoose } from '../shared/engine'
 
 const TABS = [
   ['home', 'Home', 'M4 11l8-7 8 7v9h-5v-6H9v6H4z', ['home', 'aiuto', 'novita']],
-  ['oggi', 'Allenati', 'M4 13h6l2-7 4 13 2-6h2', ['oggi', 'guida', 'registra', 'forza', 'timer', 'routine', 'costruisci', 'allenamenti']],
+  ['oggi', 'Allenati', 'M4 13h6l2-7 4 13 2-6h2', ['oggi', 'guida', 'registra', 'forza', 'timer', 'routine', 'costruisci', 'allenamenti', 'percorsi']],
   ['consulta', 'Consulta', 'M5 19v-6M12 19V6M19 19v-9', ['consulta', 'piano', 'andamento', 'test', 'corsa', 'mio-piano']],
   ['impara', 'Impara', 'M4 5h7a2 2 0 0 1 2 2v13a2 2 0 0 0-2-2H4zM20 5h-5a2 2 0 0 0-2 2v13a2 2 0 0 1 2-2h5z', ['impara']],
   ['impostazioni', 'Profilo', 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0', ['impostazioni']],
@@ -76,6 +77,7 @@ function App() {
         {base === 'guida' && <GuideView key={route} route={route} />}
         {base === 'costruisci' && <FreeBuilder />}
         {base.split('/')[0] === 'allenamenti' && <Workouts key={base} route={base} />}
+        {base.split('/')[0] === 'percorsi' && <Routes key={route} route={route} />}
         {base === 'oggi' && <Today />}
         {base === 'piano' && <PlanView />}
         {base.startsWith('registra') && <Log route={route} />}

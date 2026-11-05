@@ -4,6 +4,7 @@ import { buildTimeline, isCustom, planFor, sessionDate, sessionKey, type Activit
 import { fmtDate, PAIN as words, todayISO, WEEKDAY } from '../guide'
 import { breathHint, Field, Gauge, nav, Note, Scale } from '../ui'
 import { paceOf, parseActivityFile, timeOf, type FitResult } from '../fit'
+import { looksLikeRoute, openRouteGpx } from './Routes'
 import { painsOf, watchedZones, withPains, type Pain } from '../../shared/pain'
 import { PainPicker } from './Pain'
 import { RESULT, type GuideResult } from './Guide'
@@ -43,7 +44,11 @@ export function Log({ route }: { route: string }) {
   }
   const onFile = async (f?: File | null) => {
     if (!f) return
-    try { applyFit(await parseActivityFile(await f.arrayBuffer()), f.name) }
+    try {
+      const b = await f.arrayBuffer(), t = new TextDecoder().decode(b)
+      if (looksLikeRoute(t)) { openRouteGpx(t); return }
+      applyFit(await parseActivityFile(b), f.name)
+    }
     catch (e: any) { setErr(e.message ?? 'Non riesco a leggere questo file.'); setMsg('') }
     finally { if (file.current) file.current.value = '' }
   }
@@ -52,7 +57,11 @@ export function Log({ route }: { route: string }) {
     void (async () => {
       const c = await caches.open('btr-share'), r = await c.match('/shared.fit')
       if (r) {
-        try { applyFit(await parseActivityFile(await r.arrayBuffer()), decodeURIComponent(r.headers.get('x-name') ?? 'File')) }
+        try {
+          const b = await r.arrayBuffer(), t = new TextDecoder().decode(b)
+          if (looksLikeRoute(t)) openRouteGpx(t)
+          else applyFit(await parseActivityFile(b), decodeURIComponent(r.headers.get('x-name') ?? 'File'))
+        }
         catch (e: any) { setErr(e.message) }
         await c.delete('/shared.fit')
       }

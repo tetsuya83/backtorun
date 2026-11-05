@@ -5,6 +5,7 @@ import { Field, Note } from '../ui'
 import { RestartButton } from './MyPlan'
 import { WeatherSettings } from './Weather'
 import { IntervalsSettings } from './Import'
+import { RoutingSettings } from './Routes'
 import { isCustom, moveRace, planFor, type Activity } from '../../shared/engine'
 import { painText, watchedZones, ZONES } from '../../shared/pain'
 
@@ -86,6 +87,7 @@ export function Settings({ onLogout }: { onLogout: () => void }) {
       <Field label="Il tuo orologio"><select value={st.watch ?? ''} onChange={e => saveState({ ...st, watch: e.currentTarget.value || null })}><option value="">Nessuno: uso il GPS del telefono</option>{['Suunto', 'Garmin', 'Coros', 'Polar', 'Apple Watch', 'Altro'].map(x => <option key={x} value={x}>{x}</option>)}</select></Field>
       <p class="sub pad">Serve a scegliere come misurare la distanza negli allenamenti guidati. I dati si importano da file FIT, GPX o TCX, di qualsiasi marca.</p>
       <IntervalsSettings />
+      <RoutingSettings />
       <h2 class="phase">Gara</h2>
       <Field label={'Data della gara'}><input type="date" value={st.raceDate ?? ''} onChange={e => {
         const v = e.currentTarget.value || null

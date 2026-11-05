@@ -6,6 +6,7 @@ import { blocksOf, sessionTone } from '../../shared/blocks'
 import { learnFor } from '../learn'
 import { sessionMin } from '../../shared/tips'
 import { BodyAlerts } from './Home'
+import { SessionRoute } from './Routes'
 import { PlannedToday } from './Workouts'
 import { paceOf, timeOf } from '../fit'
 import { hrMaxOf, zoneHint, zonesFrom } from '../../shared/analysis'
@@ -38,6 +39,7 @@ function SessionHero({ s, date, done, label }: { s: Slot; date: string; done?: A
         : <>
           {run && <a class="btn ghost" href={`#/routine?id=${warm.id}`}>{warm.name}, {mins(warm)}</a>}
           {blocks && run && <a class="btn" href={`#/guida?key=${sessionKey(s, ses.day)}&date=${date}`}>Avvia allenamento guidato</a>}
+          {run && <SessionRoute skey={sessionKey(s, ses.day)} date={date} km={ses.km} label={ses.text} />}
           <a class={'btn' + (blocks && run ? ' ghost' : '')} href={`#/registra?key=${sessionKey(s, ses.day)}&date=${date}`}>Registra allenamento</a>
         </>}
       {done?.trace?.length ? <a class="btn ghost" href={`#/corsa?id=${done.id}`}>Dettaglio corsa</a> : null}
@@ -105,6 +107,7 @@ export function Today() {
         <li><a href="#/costruisci"><span><b>Costruisci un allenamento</b><small>Scegli un modello, adatta i blocchi e parti</small></span></a></li>
         <li><a href={`#/forza?date=${today}`}><span><b>Forza</b><small>Scheda guidata, in palestra o a casa</small></span></a></li>
         <li><a href="#/routine"><span><b>Routine e timer libero</b><small>Riscaldamento, mobilità, defaticamento</small></span></a></li>
+        <li><a href="#/percorsi"><span><b>Percorsi</b><small>Disegnali sulla mappa e mandali all'orologio</small></span></a></li>
         <li><a href="#/registra"><span><b>Registra un allenamento</b><small>A mano o da file FIT, GPX, TCX</small></span></a></li>
       </ul>
       <section class="panel quiet">

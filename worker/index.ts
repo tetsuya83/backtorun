@@ -3,8 +3,9 @@ import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 import planData from '../shared/plan.json'
 import { defaultState, MAX_WORKOUTS, planError, workoutError } from '../shared/engine'
 import { isStrava, remoteOf } from '../shared/intervals'
+import { MAX_ROUTES, routeError, type Pt } from '../shared/route'
 
-type Env = { Bindings: { DB: D1Database; SETUP_CODE?: string; INTERVALS_URL?: string }; Variables: { uid: number } }
+type Env = { Bindings: { DB: D1Database; SETUP_CODE?: string; INTERVALS_URL?: string; ORS_URL?: string }; Variables: { uid: number } }
 const app = new Hono<Env>()
 const COOKIE = 'btr_session'
 const ITER = 10000 // basso di proposito: il piano gratuito concede 10 ms di CPU per richiesta
@@ -22,6 +23,8 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS invites (code_hash TEXT PRIMARY KEY, user_id INTEGER, expires_at INTEGER NOT NULL, used_at INTEGER)`,
   `CREATE TABLE IF NOT EXISTS workouts (id TEXT NOT NULL, user_id INTEGER NOT NULL, json TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY (user_id, id))`,
   `CREATE TABLE IF NOT EXISTS intervals (user_id INTEGER PRIMARY KEY, api_key TEXT NOT NULL, connected_at INTEGER NOT NULL, skipped TEXT NOT NULL DEFAULT '[]')`,
+  `CREATE TABLE IF NOT EXISTS routing (user_id INTEGER PRIMARY KEY, api_key TEXT NOT NULL, connected_at INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS routes (id TEXT NOT NULL, user_id INTEGER NOT NULL, json TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY (user_id, id))`,
   `CREATE TABLE IF NOT EXISTS tests (id TEXT NOT NULL, user_id INTEGER NOT NULL, date TEXT NOT NULL, kind TEXT NOT NULL, json TEXT NOT NULL, PRIMARY KEY (user_id, id))`,
 ]
 const MAX_USERS = 10
@@ -148,7 +151,7 @@ const auth = async (c: any, next: any) => {
   if (!s) return c.json({ error: 'Sessione scaduta. Accedi di nuovo.' }, 401)
   c.set('uid', s.user_id); await next()
 }
-for (const p of ['/api/bootstrap', '/api/state', '/api/custom-plan', '/api/activities/*', '/api/tests/*', '/api/workouts/*', '/api/import', '/api/intervals/*', '/api/admin/*']) app.use(p, auth)
+for (const p of ['/api/bootstrap', '/api/state', '/api/custom-plan', '/api/activities/*', '/api/tests/*', '/api/workouts/*', '/api/routes/*', '/api/routing/*', '/api/import', '/api/intervals/*', '/api/admin/*']) app.use(p, auth)
 app.use('/api/admin/*', async (c, next) => {
   const u = await c.env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(c.get('uid')).first<{ is_admin: number }>()
   if (!u?.is_admin) return c.json({ error: 'Riservato all\'amministratore.' }, 403)
@@ -174,12 +177,12 @@ app.post('/api/admin/invites', async c => {
 app.delete('/api/admin/users/:id', async c => {
   const id = +c.req.param('id'), db = c.env.DB
   if (id === c.get('uid')) return c.json({ error: 'Non puoi eliminare il tuo account.' }, 400)
-  await db.batch(['sessions', 'state', 'user_plans', 'activities', 'tests', 'workouts', 'invites', 'intervals'].map(t => db.prepare(`DELETE FROM ${t} WHERE user_id = ?`).bind(id)).concat(db.prepare('DELETE FROM users WHERE id = ?').bind(id)))
+  await db.batch(['sessions', 'state', 'user_plans', 'activities', 'tests', 'workouts', 'invites', 'intervals', 'routing', 'routes'].map(t => db.prepare(`DELETE FROM ${t} WHERE user_id = ?`).bind(id)).concat(db.prepare('DELETE FROM users WHERE id = ?').bind(id)))
   return c.json({ ok: true })
 })
 
 const dump = async (db: D1Database, uid: number) => {
-  const [p, s, a, t, u, x, w, k] = await db.batch<any>([
+  const [p, s, a, t, u, x, w, k, r, o] = await db.batch<any>([
     db.prepare('SELECT json FROM plan WHERE id = 1'),
     db.prepare('SELECT json FROM state WHERE user_id = ?').bind(uid),
     db.prepare('SELECT json FROM activities WHERE user_id = ? ORDER BY date').bind(uid),
@@ -188,6 +191,8 @@ const dump = async (db: D1Database, uid: number) => {
     db.prepare('SELECT json FROM user_plans WHERE user_id = ?').bind(uid),
     db.prepare('SELECT json FROM workouts WHERE user_id = ? ORDER BY updated_at DESC').bind(uid),
     db.prepare('SELECT 1 ok FROM intervals WHERE user_id = ?').bind(uid),
+    db.prepare('SELECT json FROM routes WHERE user_id = ? ORDER BY updated_at DESC').bind(uid),
+    db.prepare('SELECT 1 ok FROM routing WHERE user_id = ?').bind(uid),
   ])
   return {
     plan: JSON.parse(p.results[0].json),
@@ -196,7 +201,8 @@ const dump = async (db: D1Database, uid: number) => {
     activities: a.results.map((r: any) => JSON.parse(r.json)),
     tests: t.results.map((r: any) => JSON.parse(r.json)),
     workouts: w.results.map((r: any) => JSON.parse(r.json)),
-    me: { name: u.results[0]?.name, isAdmin: !!u.results[0]?.is_admin, intervals: !!k.results[0] },
+    me: { name: u.results[0]?.name, isAdmin: !!u.results[0]?.is_admin, intervals: !!k.results[0], routing: !!o.results[0] },
+    routes: r.results.map((x: any) => JSON.parse(x.json)),
   }
 }
 app.get('/api/bootstrap', async c => c.json(await dump(c.env.DB, c.get('uid'))))
@@ -213,6 +219,15 @@ app.put('/api/workouts/:id', async c => {
   await putWorkout(db, uid, w).run(); return c.json({ ok: true })
 })
 app.delete('/api/workouts/:id', async c => { await c.env.DB.prepare('DELETE FROM workouts WHERE user_id = ? AND id = ?').bind(c.get('uid'), c.req.param('id')).run(); return c.json({ ok: true }) })
+const putRoute = (db: D1Database, uid: number, r: any) => db.prepare('INSERT INTO routes VALUES (?, ?, ?, ?) ON CONFLICT(user_id, id) DO UPDATE SET json = excluded.json, updated_at = excluded.updated_at').bind(r.id, uid, JSON.stringify(r), r.updatedAt ?? Date.now())
+app.put('/api/routes/:id', async c => {
+  const r = await c.req.json<any>(), db = c.env.DB, uid = c.get('uid'), e = r.id === c.req.param('id') ? routeError(r) : 'Percorso non valido.'
+  if (e) return c.json({ error: e }, 400)
+  const n = await db.prepare('SELECT COUNT(*) n, SUM(id = ?) me FROM routes WHERE user_id = ?').bind(r.id, uid).first<{ n: number; me: number }>()
+  if ((n?.n ?? 0) >= MAX_ROUTES && !n?.me) return c.json({ error: `Puoi salvare al massimo ${MAX_ROUTES} percorsi.` }, 409)
+  await putRoute(db, uid, r).run(); return c.json({ ok: true })
+})
+app.delete('/api/routes/:id', async c => { await c.env.DB.prepare('DELETE FROM routes WHERE user_id = ? AND id = ?').bind(c.get('uid'), c.req.param('id')).run(); return c.json({ ok: true }) })
 app.put('/api/custom-plan', async c => {
   const p = await c.req.json<any>(), e = planError(p)
   if (e) return c.json({ error: e }, 400)
@@ -230,8 +245,8 @@ app.post('/api/import', async c => {
   const d = await c.req.json<any>(), db = c.env.DB, uid = c.get('uid')
   if (!Array.isArray(d.activities) || !d.state) return c.json({ error: 'File di backup non valido.' }, 400)
   if (d.custom && planError(d.custom)) return c.json({ error: 'File di backup non valido.' }, 400)
-  if ((d.workouts ?? []).some((w: any) => workoutError(w))) return c.json({ error: 'File di backup non valido.' }, 400)
-  const stm = [putState(db, uid, d.state), ...(d.workouts ?? []).map((w: any) => putWorkout(db, uid, w)), ...(d.custom ? [putPlan(db, uid, d.custom)] : []), ...d.activities.map((a: any) => putAct(db, uid, a)), ...(d.tests ?? []).map((t: any) => putTest(db, uid, t))]
+  if ((d.workouts ?? []).some((w: any) => workoutError(w)) || (d.routes ?? []).some((r: any) => routeError(r))) return c.json({ error: 'File di backup non valido.' }, 400)
+  const stm = [putState(db, uid, d.state), ...(d.workouts ?? []).map((w: any) => putWorkout(db, uid, w)), ...(d.routes ?? []).map((r: any) => putRoute(db, uid, r)), ...(d.custom ? [putPlan(db, uid, d.custom)] : []), ...d.activities.map((a: any) => putAct(db, uid, a)), ...(d.tests ?? []).map((t: any) => putTest(db, uid, t))]
   for (let i = 0; i < stm.length; i += 50) await db.batch(stm.slice(i, i + 50))
   return c.json({ ok: true, imported: d.activities.length })
 })
@@ -280,6 +295,37 @@ app.post('/api/intervals/skip/:id', async c => {
   const list: string[] = JSON.parse(l.skipped), id = c.req.param('id')
   if (!list.includes(id)) await c.env.DB.prepare('UPDATE intervals SET skipped = ? WHERE user_id = ?').bind(JSON.stringify([...list, id].slice(-200)), c.get('uid')).run()
   return c.json({ ok: true })
+})
+// openrouteservice: come per Intervals.icu, la chiave di ognuno resta sul server e non torna mai al telefono.
+const ors = (c: any, key: string, a: number[], b: number[]) => fetch(`${c.env.ORS_URL ?? 'https://api.openrouteservice.org'}/v2/directions/foot-walking/geojson`, { method: 'POST', headers: { authorization: key, 'content-type': 'application/json', accept: 'application/geo+json' }, body: JSON.stringify({ coordinates: [a, b], elevation: true }) })
+async function orsLeg(c: any, key: string, a: number[], b: number[]) {
+  let r: Response
+  try { r = await ors(c, key, a, b) } catch { return { error: 'openrouteservice non risponde. Riprova più tardi.', status: 502 as const } }
+  const j: any = await r.json().catch(() => null)
+  if (r.status === 401 || r.status === 403) return { error: 'openrouteservice non accetta questa chiave. Controllala nel tuo account.', status: 400 as const }
+  if (r.status === 429) return { error: 'Hai raggiunto il limite di calcoli di openrouteservice. Riprova tra poco.', status: 429 as const }
+  if (j?.error?.code === 2010 || j?.error?.code === 2009) return { error: 'Nessuna strada percorribile vicino a questo punto. Prova più vicino a una via o un sentiero.', status: 422 as const }
+  const f = j?.features?.[0]
+  if (!r.ok || !f?.geometry?.coordinates) return { error: 'openrouteservice non ha calcolato il tratto. Riprova.', status: 502 as const }
+  const round = (x: number) => Math.round(x * 1e6) / 1e6
+  return { c: f.geometry.coordinates.map((p: number[]): Pt => p[2] != null ? [round(p[0]), round(p[1]), Math.round(p[2] * 10) / 10] : [round(p[0]), round(p[1])]), m: Number(f.properties?.summary?.distance ?? 0) }
+}
+const lonlat = (p: any) => Array.isArray(p) && p.length === 2 && p.every((x: any) => typeof x === 'number' && isFinite(x)) && Math.abs(p[0]) <= 180 && Math.abs(p[1]) <= 90
+app.put('/api/routing/key', async c => {
+  const key = String((await c.req.json<any>()).key ?? '').trim()
+  if (!/^[\w=+/.-]{20,600}$/.test(key)) return c.json({ error: 'Questa non sembra una chiave di openrouteservice.' }, 400)
+  const r = await orsLeg(c, key, [9.19, 45.464], [9.195, 45.466]) // prova su un breve tratto a Milano
+  if ('error' in r) return c.json({ error: r.error }, r.status)
+  await c.env.DB.prepare('INSERT INTO routing VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET api_key = excluded.api_key, connected_at = excluded.connected_at').bind(c.get('uid'), key, Date.now()).run()
+  return c.json({ ok: true })
+})
+app.delete('/api/routing/key', async c => { await c.env.DB.prepare('DELETE FROM routing WHERE user_id = ?').bind(c.get('uid')).run(); return c.json({ ok: true }) })
+app.post('/api/routing/leg', async c => {
+  const { a, b } = await c.req.json<any>(), l = await c.env.DB.prepare('SELECT api_key key FROM routing WHERE user_id = ?').bind(c.get('uid')).first<{ key: string }>()
+  if (!l) return c.json({ error: 'Collega openrouteservice in Profilo.' }, 400)
+  if (!lonlat(a) || !lonlat(b)) return c.json({ error: 'Punti non validi.' }, 400)
+  const r = await orsLeg(c, l.key, a, b)
+  return 'error' in r ? c.json({ error: r.error }, r.status) : c.json(r)
 })
 app.notFound(c => c.json({ error: 'Non trovato' }, 404))
 app.onError((e, c) => { console.error(e); return c.json({ error: 'Errore del server. Riprova.' }, 500) })

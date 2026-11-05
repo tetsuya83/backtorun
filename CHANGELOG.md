@@ -6,6 +6,15 @@ Numerazione: il numero centrale cresce quando cambia una funzione, l'ultimo quan
 
 Le sezioni ammesse in ogni versione sono Aggiunto, Modificato e Tolto.
 
+## 1.19.0 - 2026-11-05
+
+### Aggiunto
+
+- Editor dei percorsi su mappa, con linea su strade e sentieri, distanza, dislivello, anello e andata e ritorno.
+- Collegamento di un percorso alla seduta del piano, con il confronto sulla distanza.
+- Scambio di percorsi con le app degli orologi tramite file GPX.
+- Mini-tutorial nella Guida per collegare openrouteservice e Intervals.icu.
+
 ## 1.18.0 - 2026-11-05
 
 ### Aggiunto

@@ -1,8 +1,9 @@
 import { signal } from '@preact/signals'
 import { defaultState, normalizePlan, type Activity, type Plan, type Planned, type State, type Workout } from '../shared/engine'
 import type { Remote } from '../shared/intervals'
+import type { Route } from '../shared/route'
 export interface TestRec { id: string; date: string; kind: string; data: any }
-export interface Data { plan: Plan; custom?: Plan | null; state: State; activities: Activity[]; tests: TestRec[]; workouts?: Workout[]; me?: { name: string; isAdmin: boolean; intervals?: boolean } }
+export interface Data { plan: Plan; custom?: Plan | null; state: State; activities: Activity[]; tests: TestRec[]; workouts?: Workout[]; routes?: Route[]; me?: { name: string; isAdmin: boolean; intervals?: boolean; routing?: boolean } }
 export const data = signal<Data | null>(null)
 export const pending = signal(0)
 export const imports = signal<Remote[]>([])
@@ -97,6 +98,17 @@ export function saveWorkout(w: Workout) {
   commit({ ...d, workouts: [w, ...(d.workouts ?? []).filter(x => x.id !== w.id)] })
   enqueue({ method: 'PUT', url: `/api/workouts/${w.id}`, body: w })
 }
+export function saveRoute(r: Route) {
+  const d = data.value!; r = { ...r, updatedAt: Date.now() }
+  commit({ ...d, routes: [r, ...(d.routes ?? []).filter(x => x.id !== r.id)] })
+  enqueue({ method: 'PUT', url: `/api/routes/${r.id}`, body: r })
+}
+export function deleteRoute(id: string) {
+  const d = data.value!
+  commit({ ...d, routes: (d.routes ?? []).filter(x => x.id !== id) })
+  enqueue({ method: 'DELETE', url: `/api/routes/${id}` })
+}
+export function setRoutingLinked(on: boolean) { const d = data.value!; commit({ ...d, me: { ...d.me!, routing: on } }) }
 export function deleteWorkout(id: string) {
   const d = data.value!
   commit({ ...d, workouts: (d.workouts ?? []).filter(x => x.id !== id) })
