@@ -6,6 +6,23 @@ Numerazione: il numero centrale cresce quando cambia una funzione, l'ultimo quan
 
 Le sezioni ammesse in ogni versione sono Aggiunto, Modificato e Tolto.
 
+## 1.20.0 - 2026-11-06
+
+### Aggiunto
+
+- Impostazioni del piano personale, modificabili quando vuoi: il piano si ricalcola dalla prossima settimana e tiene, se vuoi, le settimane cambiate a mano.
+- Ora e tempo disponibile per ogni giorno, con le sedute accorciate nei giorni stretti.
+- Numero di uscite separato dai giorni liberi, con crescita graduale facoltativa.
+- Da nessuna a due sedute impegnative, con il giorno a scelta.
+- Scarico ogni 3 o 4 settimane, crescita del lungo normale o prudente e settimane di pausa.
+- Meno uscite del minimo, solo confermando di procedere a tuo rischio, con la spiegazione e le fonti.
+- Giorni a scelta per la Maratona graduale.
+
+### Modificato
+
+- Procedura per creare il piano in sei passi, con barra di avanzamento, consigli e anteprima della prima settimana.
+- Giorni di corsa da 2 a 7, e fino a tre giorni di forza.
+
 ## 1.19.0 - 2026-11-05
 
 ### Aggiunto

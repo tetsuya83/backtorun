@@ -2,7 +2,7 @@
 import { upper } from './engine'
 import { blocksOf, blocksSec, type Block } from './blocks'
 
-export interface WeatherPrefs { city?: string | null; lat?: number | null; lon?: number | null; gps?: boolean; hour?: number; sunday?: number }
+export interface WeatherPrefs { city?: string | null; lat?: number | null; lon?: number | null; gps?: boolean; hour?: number; sunday?: number; days?: Partial<Record<'lun' | 'mar' | 'mer' | 'gio' | 'ven' | 'sab' | 'dom', number>> }
 export interface Hour { t: string; temp: number; feels: number; rainP: number; rain: number; wind: number; gust: number; code: number; day: boolean }
 export interface Forecast { at: number; place: string; key: string; hours: Hour[] }
 export type RunKind = 'cammino' | 'facile' | 'lungo' | 'intenso'
@@ -28,7 +28,9 @@ export function dayRange(f: Forecast, date: string) {
   return l.length ? { min: Math.min(...l), max: Math.max(...l) } : null
 }
 /** Ora abituale della corsa: la domenica può essere diversa. */
-export const runHour = (p: WeatherPrefs, date: string) => new Date(date + 'T12:00:00Z').getUTCDay() === 0 ? p.sunday ?? 8 : p.hour ?? 6
+const WD = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'] as const
+/** Ora dell'uscita: quella del giorno, se l'hai scelta, altrimenti quella dei feriali o della domenica. */
+export const runHour = (p: WeatherPrefs, date: string) => { const w = new Date(date + 'T12:00:00Z').getUTCDay(); return p.days?.[WD[w]] ?? (w === 0 ? p.sunday ?? 8 : p.hour ?? 6) }
 
 export type Sky = 'sole' | 'nubi' | 'nebbia' | 'pioggia' | 'neve' | 'temporale'
 export function skyOf(code: number): { sky: Sky; text: string } {

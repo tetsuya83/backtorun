@@ -2,6 +2,7 @@ import type { ExerciseLog } from './training'
 import { blocksError, type Block, type Lap, type Sport } from './blocks'
 import type { Pain } from './pain'
 import type { WeatherPrefs } from './weather'
+import type { GoalInput } from './generator'
 export type Day = 'lun' | 'mar' | 'mer' | 'gio' | 'ven' | 'sab' | 'dom'
 export const DAYS: Day[] = ['lun', 'mar', 'mer', 'gio', 'ven', 'sab', 'dom']
 export interface Session { day: Day; text: string; km: number | null; fiato?: string | null; fatica?: string | null; race?: boolean; blocks?: Block[] | null; replaced?: boolean }
@@ -9,10 +10,12 @@ export interface Session { day: Day; text: string; km: number | null; fiato?: st
 export interface Workout { id: string; name: string; sport: Sport; text: string; km: number | null; blocks: Block[]; fiato?: string | null; fatica?: string | null; updatedAt?: number }
 /** Copia di un allenamento messa in un giorno del calendario: aggiunta alla giornata o al posto della seduta. */
 export interface Planned extends Omit<Workout, 'updatedAt'> { date: string; mode: 'add' | 'replace'; workoutId?: string | null }
-export interface Week { week: number | string; phase: number; scarico: boolean; skippable: boolean; total: number | null; sessions: Session[]; uid?: string }
-export interface PlanMeta { phases: Record<string, string>; kind?: 'custom'; id?: string; name?: string; strengthDays?: Day[] }
+export interface Week { week: number | string; phase: number; scarico: boolean; skippable: boolean; total: number | null; sessions: Session[]; uid?: string; pause?: boolean; edited?: boolean }
+export interface PlanMeta { phases: Record<string, string>; kind?: 'custom'; id?: string; name?: string; strengthDays?: Day[]; goal?: Omit<GoalInput, 'id' | 'resume'> }
 export interface Plan { meta: PlanMeta; weeks: Week[]; maintenance: Week[] }
-export interface State { startDate: string; startWeek: number; skips: number[]; repeats: number[]; raceDate: string | null; raceName?: string | null; mode?: 'base' | 'custom'; hrMax?: number | null; watch?: string | null; zones?: string[] | null; weather?: WeatherPrefs | null; planned?: Planned[]; restart?: boolean; round?: number; other?: Partial<State> | null }
+export interface State { startDate: string; startWeek: number; skips: number[]; repeats: number[]; raceDate: string | null; raceName?: string | null; mode?: 'base' | 'custom'; hrMax?: number | null; watch?: string | null; zones?: string[] | null; weather?: WeatherPrefs | null; planned?: Planned[]; restart?: boolean; round?: number; other?: Partial<State> | null; baseDays?: BaseDays | null }
+/** Giorni scelti per la Maratona graduale: le sue quattro uscite e la forza. */
+export interface BaseDays { days: Day[]; long: Day; strength: Day[] }
 export interface Activity {
   id: string; date: string; type: 'corsa' | 'forza' | 'nuoto' | 'bici' | 'altro'; sessionKey?: string | null; source: 'manuale' | 'fit' | 'gpx' | 'tcx' | 'gps' | 'intervals'; externalId?: string | null
   km?: number | null; seconds?: number | null; hrAvg?: number | null; hrMax?: number | null; hrLast?: number | null
@@ -38,7 +41,34 @@ export const sessionKey = (s: Slot, day: Day) => `${s.key}-${day}`
 export const isCustom = (p: Plan) => p.meta.kind === 'custom'
 export const strengthDays = (p: Plan): Day[] => p.meta.strengthDays ?? (isCustom(p) ? [] : ['lun', 'gio'])
 /** Piano in uso: quello personale solo se attivo e presente. */
-export const planFor = (d: { plan: Plan; custom?: Plan | null; state: State }) => d.state.mode === 'custom' && d.custom ? d.custom : d.plan
+export const planFor = (d: { plan: Plan; custom?: Plan | null; state: State }) => d.state.mode === 'custom' && d.custom ? d.custom : remapBase(d.plan, d.state.baseDays)
+
+const ring = (a: Day, b: Day) => { const x = Math.abs(DAYS.indexOf(a) - DAYS.indexOf(b)); return Math.min(x, 7 - x) }
+/** Dove vanno le uscite della Maratona graduale: la qualità del martedì nel giorno più lontano dal lungo, mercoledì e venerdì nei due che seguono. */
+export function baseMapping(b: BaseDays): Record<Day, Day> {
+  const others = b.days.filter(d => d !== b.long), q = [...others].sort((x, y) => ring(y, b.long) - ring(x, b.long) || DAYS.indexOf(x) - DAYS.indexOf(y))[0]
+  const after = (d: Day) => (DAYS.indexOf(d) - DAYS.indexOf(q) + 7) % 7, [e1, e2] = others.filter(d => d !== q).sort((x, y) => after(x) - after(y))
+  return { mar: q, mer: e1, ven: e2, dom: b.long, lun: 'lun', gio: 'gio', sab: 'sab' }
+}
+export const baseDaysOk = (b?: BaseDays | null): b is BaseDays => !!b && new Set(b.days).size === 4 && b.days.every(d => DAYS.includes(d)) && b.days.includes(b.long)
+const remapped = new WeakMap<Plan, Map<string, Plan>>()
+/** Il piano base con i giorni scelti; senza scelta resta quello originale. La maratona resta di domenica. */
+export function remapBase(plan: Plan, b?: BaseDays | null): Plan {
+  if (!baseDaysOk(b) || isCustom(plan)) return plan
+  const key = JSON.stringify(b), cache = remapped.get(plan) ?? new Map<string, Plan>()
+  remapped.set(plan, cache)
+  const hit = cache.get(key); if (hit) return hit
+  const m = baseMapping(b)
+  const week = (w: Week): Week => {
+    const race = w.sessions.find(s => s.race || /^maratona$/i.test(s.text.trim()))
+    const sessions = w.sessions.filter(s => s !== race).map(s => ({ ...s, day: m[s.day] })).filter(s => !race || s.day !== race.day)
+    if (race) sessions.push({ ...race, race: true })
+    return { ...w, sessions: sessions.sort(byDay) }
+  }
+  const out: Plan = { ...plan, meta: { ...plan.meta, strengthDays: b.strength.filter(d => !b.days.includes(d)) }, weeks: plan.weeks.map(week), maintenance: plan.maintenance.map(week) }
+  cache.set(key, out)
+  return out
+}
 
 export interface Timeline { slots: Slot[]; raceTooClose: boolean; earliestRace: string; spareWeeks: number }
 

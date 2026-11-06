@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'preact/hooks'
 import { data, restartPlan, saveCustomPlan, saveState, startCustomPlan, uid, switchPlan } from '../api'
 import { addDays, DAYS, mondayOf, mustChoose, planError, type Day, type Plan, type Session, type Week } from '../../shared/engine'
-import { blankPlan, generatePlan, MAX_KM, MIN_KM, RACES, type GoalInput, type RaceType } from '../../shared/generator'
+import { blankPlan } from '../../shared/generator'
 import { fmtDate, todayISO, WEEKDAY } from '../guide'
 import { BlockList, Field, nav, Note } from '../ui'
 import { blocksOf } from '../../shared/blocks'
@@ -40,14 +40,18 @@ export function MyPlan() {
         <p>{d.custom.weeks.length} settimane{mode === 'custom' && d.state.raceDate ? `, gara il ${longDate(d.state.raceDate)}` : ''}.</p>
         <div class="row">
           {(mode !== 'custom' || first) && <button class="btn" type="button" onClick={() => pick('custom')}>Usa questo piano</button>}
-          <a class="btn ghost" href="#/mio-piano/modifica">Modifica</a>
+          {d.custom.meta.goal && <a class="btn ghost" href="#/mio-piano/impostazioni">Impostazioni</a>}
+          <a class="btn ghost" href="#/mio-piano/modifica">Modifica le sedute</a>
         </div>
       </section>}
       <section class={'panel choice' + (mode === 'base' && !first ? ' go' : '')}>
         {mode === 'base' && !first && <p class="eyebrow">In uso</p>}
         <h2>Maratona graduale</h2>
         <p>Un percorso già pronto: 50 settimane dal cammino-corsa alla maratona. Con il test della Scala trovi la settimana da cui iniziare.</p>
-        {(mode !== 'base' || first) && <button class="btn ghost" type="button" onClick={() => pick('base')}>Scegli questo percorso</button>}
+        <div class="row">
+          {(mode !== 'base' || first) && <button class="btn ghost" type="button" onClick={() => pick('base')}>Scegli questo percorso</button>}
+          <a class="btn ghost" href="#/mio-piano/giorni">{d.state.baseDays || d.state.other?.baseDays ? 'Cambia i giorni' : 'Scegli i tuoi giorni'}</a>
+        </div>
       </section>
       <section class="panel choice">
         <h2>Scrivi la tua tabella</h2>
@@ -56,78 +60,6 @@ export function MyPlan() {
       </section>
       {!first && <RestartButton />}
     </div>
-  )
-}
-
-type Path = 'zero' | 'ritorno' | 'corro' | 'migliora'
-const PATHS: { id: Path; label: string; hint: string; set: Partial<GoalInput> }[] = [
-  { id: 'zero', label: 'Inizio da zero', hint: 'Non corro, o ho appena cominciato', set: { weeklyKm: 0, longestKm: 0, ambition: 'finire' } },
-  { id: 'ritorno', label: 'Riprendo dopo uno stop', hint: 'Ho già corso, ma mi sono fermato', set: { weeklyKm: 0, longestKm: 1, ambition: 'finire' } },
-  { id: 'corro', label: 'Corro già', hint: 'Esco con regolarità e voglio un obiettivo', set: { weeklyKm: 15, longestKm: 8, ambition: 'finire' } },
-  { id: 'migliora', label: 'Voglio migliorare', hint: 'Corro da tempo e cerco un tempo migliore', set: { weeklyKm: 25, longestKm: 12, ambition: 'migliorare' } },
-]
-
-/** Procedura guidata: percorso, obiettivo, situazione attuale, settimana, anteprima. */
-export function NewPlan() {
-  const [step, setStep] = useState(0), [path, setPath] = useState<Path | null>(null), [id] = useState(() => uid().slice(0, 8))
-  const [g, setG] = useState<GoalInput>({ id, race: '10k', km: 10, raceName: '', raceDate: null, ambition: 'finire', weeklyKm: 0, longestKm: 0, days: ['mar', 'gio', 'dom'], longDay: 'dom', strengthDays: [], startDate: nextMon() })
-  const up = (p: Partial<GoalInput>) => setG(x => ({ ...x, ...p }))
-  const free = g.race === 'trail' || g.race === 'altro'
-  const kmOk = g.km >= MIN_KM && g.km <= MAX_KM
-  const dateOk = !g.raceDate || g.raceDate > g.startDate
-  const res = useMemo(() => kmOk && g.days.length >= 3 ? generatePlan(g) : null, [g])
-  const days = DAYS.filter(d => g.days.includes(d))
-  const setDays = (l: Day[]) => up({ days: l, longDay: l.includes(g.longDay) ? g.longDay : (l.at(-1) ?? 'dom'), strengthDays: g.strengthDays.filter(x => !l.includes(x)) })
-  const steps = ['Da dove parti?', 'Il tuo obiettivo', 'Come stai oggi', 'La tua settimana', 'Il piano']
-  const can = [!!path, kmOk && dateOk, true, days.length >= 3, !!res && !res.blocked][step], fit = g.race === 'forma', runner = path === 'corro' || path === 'migliora'
-  const create = () => { if (!res) return; startCustomPlan(res.plan, { startDate: res.startDate, raceDate: g.raceDate || null, raceName: g.raceName || null }); nav('piano') }
-  const phases = res ? res.plan.weeks.reduce<{ name: string; n: number; km: number }[]>((a, w) => {
-    const name = res.plan.meta.phases[String(w.phase)], l = a.at(-1)
-    if (l?.name === name) { l.n++; l.km = Math.max(l.km, w.total ?? 0) } else a.push({ name, n: 1, km: w.total ?? 0 })
-    return a
-  }, []) : []
-  return (
-    <form class="stack form" onSubmit={e => e.preventDefault()}>
-      <section class="head"><p class="eyebrow">Passo {step + 1} di 5</p><h1>{steps[step]}</h1></section>
-      {step === 0 && <><ul class="cards">{PATHS.map(x => <li key={x.id}><button type="button" class={path === x.id ? 'on' : ''} aria-pressed={path === x.id} onClick={() => { setPath(x.id); up(x.set) }}><span><b>{x.label}</b><small>{x.hint}</small></span></button></li>)}</ul>
-        {path === 'ritorno' && <Note>Se ti sei fermato per un infortunio, senti il medico prima di ripartire.</Note>}</>}
-      {step === 1 && <>
-        <fieldset class="scale"><legend>Cosa vuoi raggiungere?</legend><div class="seg race">{RACES.map(r => <button type="button" key={r.id} class={g.race === r.id ? 'sel' : ''} aria-pressed={g.race === r.id} onClick={() => up({ race: r.id as RaceType, km: r.km ?? (free ? g.km : 15) })}>{r.label}</button>)}</div></fieldset>
-        {free && <Field label={`Distanza in km, da ${MIN_KM} a ${MAX_KM}`}><input inputMode="decimal" value={g.km || ''} onInput={e => up({ km: num(e.currentTarget.value) })} /></Field>}
-        {free && g.km > 0 && !kmOk && <p class="err">Per una distanza così usa la tabella da compilare a mano.</p>}
-        {g.race === 'trail' && <p class="sub pad">Conta i km della gara: per il dislivello il piano aggiunge salite e lunghi su sterrato.</p>}
-        {!fit && <Field label="Data della gara, se ce l'hai"><input type="date" value={g.raceDate ?? ''} onChange={e => up({ raceDate: e.currentTarget.value || null })} /></Field>}
-        {!dateOk && <p class="err">La gara deve essere dopo l'inizio del piano.</p>}
-        {!fit && <Field label="Nome della gara, facoltativo"><input value={g.raceName ?? ''} onInput={e => up({ raceName: e.currentTarget.value })} maxLength={50} /></Field>}
-        {fit && <p class="sub pad">Niente gara: il percorso ti porta a correre 10 km con continuità.</p>}
-      </>}
-      {step === 2 && <>
-        {runner && <p class="sub pad">Scrivi i numeri reali: partire più piano costa poche settimane, partire troppo forte può fermarti per mesi.</p>}
-        {runner && <Field label="Quanti km corri a settimana adesso?"><input inputMode="decimal" value={g.weeklyKm || ''} placeholder="0" onInput={e => up({ weeklyKm: num(e.currentTarget.value) })} /></Field>}
-        {runner && <Field label="La corsa più lunga dell'ultimo mese, in km"><input inputMode="decimal" value={g.longestKm || ''} placeholder="0" onInput={e => up({ longestKm: num(e.currentTarget.value) })} /></Field>}
-        {g.longestKm < 3 && <Note>Il piano partirà dal cammino-corsa.</Note>}
-        <Field label="Quando vuoi iniziare?"><input type="date" value={g.startDate} min={todayISO()} onChange={e => up({ startDate: e.currentTarget.value || nextMon() })} /></Field>
-      </>}
-      {step === 3 && <>
-        <DayPicker label="Giorni di corsa, almeno 3" value={g.days} onChange={l => { if (l.length <= 5) setDays(l) }} />
-        {days.length >= 3 && <fieldset class="scale"><legend>Giorno del lungo</legend><div class="seg">{days.map(d => <button type="button" key={d} class={g.longDay === d ? 'sel' : ''} onClick={() => up({ longDay: d })}>{WEEKDAY[d].slice(0, 3)}</button>)}</div></fieldset>}
-        <DayPicker label="Forza, facoltativa" value={g.strengthDays} disabled={g.days} onChange={l => up({ strengthDays: l.slice(-2) })} />
-        <p class="sub pad">Due sedute di forza a settimana proteggono da molti infortuni della corsa.</p>
-        {days.length < 3 && <p class="err">Scegli almeno 3 giorni.</p>}
-      </>}
-      {step === 4 && res && <>
-        <div class="stats"><div><b>{res.weeks}</b><span>settimane</span></div><div><b>{res.reachedLong}</b><span>km di lungo</span></div><div><b>{Math.round(res.peakWeek)}</b><span>km a settimana, al massimo</span></div></div>
-        <p class="pad">Inizi il {longDate(res.startDate)}{g.raceDate ? `, gara il ${longDate(g.raceDate)}` : ''}.</p>
-        {res.warnings.map(w => <Note key={w} tone={res.blocked ? 'stop' : undefined}>{w}</Note>)}
-        {res.blocked && res.earliestRace && <Note>Una gara dal {longDate(res.earliestRace)} in poi ti lascia il tempo giusto. Puoi scegliere un'altra data o una distanza più corta.</Note>}
-        <ul class="hist people">{phases.map(p => <li key={p.name}><div><b>{p.name}</b><span>{p.n} {p.n === 1 ? 'settimana' : 'settimane'}{p.km ? `, fino a ${Math.round(p.km)} km` : ''}</span></div></li>)}</ul>
-        <p class="sub pad">Le progressioni sono stime da allenatore e non sostituiscono il parere del medico. Dopo la creazione puoi modificare ogni seduta.</p>
-      </>}
-      <div class="row">
-        {step > 0 ? <button type="button" class="btn ghost" onClick={() => { setStep(step - 1); scrollTo(0, 0) }}>Indietro</button> : <a class="btn ghost" href="#/mio-piano">Annulla</a>}
-        {step < 4 ? <button type="button" class="btn" disabled={!can} onClick={() => { setStep(step + 1); scrollTo(0, 0) }}>Avanti</button> : <button type="button" class="btn" disabled={!can} onClick={create}>Attiva il piano</button>}
-      </div>
-    </form>
   )
 }
 
@@ -190,7 +122,9 @@ export function EditPlan() {
   const save = () => {
     const e = planError(p); if (e) { setErr(e); return }
     const st = d.state, was = (d.custom?.weeks ?? []).map(w => w.uid)
-    const next = saveCustomPlan(p)
+    // le settimane cambiate a mano si possono tenere quando il piano si ricalcola
+    const before = new Map((d.custom?.weeks ?? []).map(w => [w.uid, JSON.stringify([w.sessions, w.scarico])]))
+    const next = saveCustomPlan({ ...p, weeks: p.weeks.map(w => w.edited || before.get(w.uid) === JSON.stringify([w.sessions, w.scarico]) ? w : { ...w, edited: true }) })
     // le ripetizioni seguono la settimana anche se la numerazione cambia
     const repeats = st.repeats.map(n => next.weeks.find(w => w.uid === was[n - 1])?.week as number | undefined).filter((x): x is number => x != null)
     if (st.mode === 'custom' && repeats.join() !== st.repeats.join()) saveState({ ...st, repeats })

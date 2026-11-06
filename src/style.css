@@ -168,3 +168,13 @@ main.pg-percorsi>.stack{max-width:none}main.pg-percorsi>.rt-ed{max-width:none}
 main.pg-percorsi .rt-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 .rt-sum .bigkm b{font-size:44px}
+/* procedura del piano */
+.progress{height:6px;background:var(--track);border-radius:3px;overflow:hidden}.progress span{display:block;height:100%;background:var(--btn);border-radius:3px;transition:width .25s}
+.tip{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;font-size:14px;line-height:1.45;color:var(--body);background:var(--field);border-radius:var(--r-s)}.tip>span:first-child{flex:none}
+.dayrows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}.dayrows li{background:var(--card);border-radius:var(--r-s);box-shadow:var(--shadow);padding:4px 14px}.dayrows li.on{box-shadow:inset 0 0 0 2px var(--btn);padding-bottom:12px}.dayrows .grid2{margin-top:2px}
+.seg.num button{display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:48px;line-height:1.1}.seg.num small{font-size:10px;font-weight:500;opacity:.8}
+details.more{background:var(--card);border-radius:var(--r-s);box-shadow:var(--shadow);padding:0 14px}details.more summary{min-height:50px;display:flex;align-items:center;cursor:pointer;font-weight:600}details.more[open]{padding-bottom:14px}
+.chips{list-style:none;margin:0 0 8px;padding:0;display:flex;flex-wrap:wrap;gap:6px}.chips li{display:flex;align-items:center;gap:4px;padding:4px 4px 4px 12px;background:var(--track);border-radius:980px;font-size:14px}.chips .link{min-height:32px;padding:0 8px}
+.note .why{margin:8px 0;padding-left:18px;display:flex;flex-direction:column;gap:6px}.note p+p{margin-top:8px}.note .src{font-size:13px;color:var(--muted)}.note .src a{color:inherit}
+.weekprev{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}.weekprev li{display:flex;flex-direction:column;gap:2px}.weekprev span{color:var(--soft);font-size:15px}
+.weekprev.phases{gap:6px}.weekprev.phases li{background:var(--card);border-radius:var(--r-s);box-shadow:var(--shadow);padding:12px 14px}

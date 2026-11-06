@@ -6,7 +6,7 @@ import { Field, Note } from '../ui'
 import { buildTimeline, planFor } from '../../shared/engine'
 import { fuelPlan, type Climate } from '../../shared/fuel'
 import { nextLong, sessionMin, tipsFor } from '../../shared/tips'
-import { adviceTitle, advise, hourAt, kindOf, manualHour, type RunKind } from '../../shared/weather'
+import { adviceTitle, advise, hourAt, kindOf, manualHour, runHour, type RunKind } from '../../shared/weather'
 import { dayHour, outing } from './Weather'
 import { forecast, prefsOf } from '../weather'
 
@@ -59,7 +59,7 @@ const seen = (): string[] => { try { return JSON.parse(localStorage.getItem(KEY)
 export function PlanTip() {
   const d = data.value!, [hid, setHid] = useState(seen), t = buildTimeline(planFor(d), d.state), today = todayISO(), p = prefsOf(d)
   const runKm = d.activities.reduce((a, x) => a + (x.type === 'corsa' ? x.km ?? 0 : 0), 0)
-  const tip = tipsFor({ slots: t.slots, today, raceDate: d.state.raceDate, runKm, hour: p.hour ?? 6 }).find(x => !hid.includes(x.key))
+  const tip = tipsFor({ slots: t.slots, today, raceDate: d.state.raceDate, runKm, hour: runHour(p, today) }).find(x => !hid.includes(x.key))
   const a = tip && articleById(tip.to)
   if (!tip || !a) return null
   const hide = () => { const l = [...hid, tip.key]; setHid(l); try { localStorage.setItem(KEY, JSON.stringify(l)) } catch { /* resta nascosto fino alla prossima apertura */ } }

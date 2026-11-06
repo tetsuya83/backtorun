@@ -13,7 +13,8 @@ import { Settings } from './views/Settings'
 import { Strength } from './views/Strength'
 import { RunView } from './views/Run'
 import { RoutineView, TimerView } from './views/Timer'
-import { BlankPlan, EditPlan, MyPlan, NewPlan } from './views/MyPlan'
+import { BlankPlan, EditPlan, MyPlan } from './views/MyPlan'
+import { BaseDaysView, NewPlan, PlanSettings } from './views/PlanSetup'
 import { Consult, Home } from './views/Home'
 import { Learn } from './views/Learn'
 import { Help } from './views/Help'
@@ -91,6 +92,8 @@ function App() {
         {base === 'mio-piano/nuovo' && <NewPlan />}
         {base === 'mio-piano/tabella' && <BlankPlan />}
         {base === 'mio-piano/modifica' && <EditPlan />}
+        {base === 'mio-piano/impostazioni' && <PlanSettings />}
+        {base === 'mio-piano/giorni' && <BaseDaysView />}
         {base === 'impostazioni' && <Settings onLogout={() => setAuth('login')} />}
       </main>
       <nav class="tabs">
