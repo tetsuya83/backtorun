@@ -219,3 +219,5 @@ details.more{background:var(--card);border-radius:var(--r-s);box-shadow:var(--sh
 .wk-dots.ok{color:var(--go);font-weight:600}
 .b-act .chip-a{display:inline-flex;align-items:center;min-height:36px;padding:0 12px;border-radius:99px;background:var(--blue-t);color:var(--blue-i);font-weight:600}
 @media (min-width:1024px){.top .back{margin-right:auto;margin-left:0}main.pg-diario>.stack{max-width:760px}.log .savebar{bottom:0}.immersive .app{padding-left:0}.timer.full{max-width:520px;margin-inline:auto}}
+.hms>div.two{grid-template-columns:repeat(2,minmax(0,1fr))}.src{margin:0;padding-left:18px;font-size:14px;display:flex;flex-direction:column;gap:6px}
+details.more>summary b{flex:none}

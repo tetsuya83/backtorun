@@ -105,7 +105,7 @@ function App() {
         {base === 'piano' && <PlanView />}
         {base === 'gara' && <RaceSettings />}
         {base.startsWith('registra') && <Log route={route} />}
-        {base === 'test' && <Tests />}
+        {base === 'test' && <Tests key={route} route={route} />}
         {base === 'corsa' && <RunView route={route} />}
         {base === 'forza' && <Strength key={route} route={route} />}
         {base === 'timer' && <TimerView key={route} route={route} />}

@@ -6,6 +6,19 @@ Numerazione: il numero centrale cresce quando cambia una funzione, l'ultimo quan
 
 Le sezioni ammesse in ogni versione sono Aggiunto, Modificato e Tolto.
 
+## 1.22.0 - 2026-11-07
+
+### Aggiunto
+
+- Pagina Test nel Piano con quattro test: la Scala, il test del cammino, il test di Cooper e i 5 km a tempo, con il consiglio su quale fare.
+- Per Cooper e 5 km: VO2max stimato, ritmo facile e settimana della Maratona graduale da cui partire, mai oltre il volume che corri già.
+- Cronometro guidato per i test, che alla fine torna al test con il risultato inserito.
+- Storico dei risultati e promemoria facoltativo ogni 8 settimane, nella settimana di scarico, da rimandare o spegnere.
+
+### Tolto
+
+- L'invito fisso a fare il test della Scala in Oggi.
+
 ## 1.21.0 - 2026-11-07
 
 ### Aggiunto

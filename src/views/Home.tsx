@@ -13,6 +13,7 @@ import { sessionMin } from '../../shared/tips'
 import { cooldownFor, routineById, totalOf, warmupFor, type Routine } from '../../shared/training'
 import { paceOf, timeOf } from '../fit'
 import { unlockSound } from '../sound'
+import { suggestTest, testDue, testInfo } from '../../shared/tests'
 
 export const phaseName = (plan: Plan, p: number) => plan.meta.phases[String(p)] ?? 'Piano'
 export const weekLabel = (s: Slot) => s.maintenance ? 'Mantenimento' : `Settimana ${s.week}`
@@ -66,7 +67,7 @@ const name = (s?: string) => s ? s[0].toUpperCase() + s.slice(1) : ''
 /** Parti: il cronometro si apre e comincia da solo, senza la pagina di preparazione. */
 const go = (url: string) => { unlockSound(); nav(url) }
 function TodayCard() {
-  const d = data.value!, plan = planFor(d), custom = isCustom(plan), t = buildTimeline(plan, d.state), today = todayISO(), first = t.slots[0]
+  const d = data.value!, plan = planFor(d), t = buildTimeline(plan, d.state), today = todayISO(), first = t.slots[0]
   const slot = slotForDate(t, today), ses = slot?.sessions.find(x => sessionDate(slot, x.day) === today)
   const key = slot && ses ? sessionKey(slot, ses.day) : ''
   const done = key ? d.activities.find(a => a.sessionKey === key) : undefined
@@ -76,7 +77,7 @@ function TodayCard() {
   if (!started) return <section class="panel today-c">
     <p class="eyebrow">Mancano {Math.ceil((Date.parse(first.monday) - Date.parse(today)) / 864e5)} giorni</p>
     <h2>Si parte il {fmtDate(first.monday, { day: 'numeric', month: 'long' })}, dalla settimana {first.week}</h2>
-    {custom ? <a class="btn ghost" href="#/piano">Guarda il piano</a> : <a class="btn" href="#/test">Fai il test della Scala</a>}
+    <a class="btn ghost" href="#/piano">Guarda il piano</a>
   </section>
   if (!slot) return <section class="panel today-c"><p class="eyebrow">Piano concluso</p><h2>Bel lavoro</h2><a class="btn" href="#/mio-piano">Scegli il prossimo obiettivo</a></section>
   const label = `Oggi · ${weekLabel(slot)} · ${phaseName(plan, slot.phase)}${slot.scarico ? ', scarico' : ''}`
@@ -130,6 +131,22 @@ function Review() {
     </section>}
   </>
 }
+/** Test di controllo: facoltativo, ogni 8 settimane, solo se ne hai già fatto uno. */
+function TestReminder() {
+  const d = data.value!, plan = planFor(d), t = buildTimeline(plan, d.state), today = todayISO(), slot = slotForDate(t, today)
+  if (!slot || today < t.slots[0].monday) return null
+  const soon = t.slots.some(s => s.sessions.some(x => /\btest\b/i.test(x.text) && sessionDate(s, x.day) >= today && sessionDate(s, x.day) <= addDays(today, 14)))
+  const due = testDue({ tests: d.tests, today, scarico: !!slot.scarico, planTestSoon: soon, off: d.state.testRemind === false, snooze: d.state.testSnooze })
+  if (!due) return null
+  const sug = suggestTest(d.activities, today, isCustom(plan) || typeof slot.week !== 'number' ? null : slot.week)
+  return <section class="panel warn" aria-label="Test di controllo">
+    <p class="eyebrow">Test di controllo, facoltativo</p>
+    <h2>{due.weeks} settimane dall'ultimo test</h2>
+    <p>{slot.scarico ? 'Questa è una settimana di scarico: il momento giusto per misurarti.' : 'Fallo quando vuoi, dopo un giorno facile.'} Ti consiglio {testInfo(sug.kind)!.name.replace(/^La /, 'la ')}.</p>
+    <div class="row"><a class="btn ghost" href={`#/test?k=${sug.kind}`}>Apri il test</a><button type="button" class="btn ghost" onClick={() => saveState({ ...d.state, testSnooze: addDays(today, 28) })}>Tra 4 settimane</button></div>
+    <button type="button" class="link" onClick={() => saveState({ ...d.state, testRemind: false })}>Non propormelo più</button>
+  </section>
+}
 function NextRun() {
   const d = data.value!, t = buildTimeline(planFor(d), d.state), today = todayISO()
   const next = t.slots.flatMap(s => s.sessions.filter(x => x.km !== 0).map(x => ({ date: sessionDate(s, x.day), x }))).filter(x => x.date > today).sort((a, b) => a.date.localeCompare(b.date))[0]
@@ -146,6 +163,7 @@ export function Home() {
     <WeekStrip />
     <TodayCard />
     <Review />
+    <TestReminder />
     <PlannedToday />
     <NextRun />
     </div><div class="col">

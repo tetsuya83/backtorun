@@ -7,6 +7,7 @@ import { BlockList, Gauge } from '../ui'
 import { blocksOf } from '../../shared/blocks'
 import { learnFor } from '../learn'
 import { PlannedRow, SaveSession } from './Workouts'
+import { testInfo } from '../../shared/tests'
 
 function WeekRow({ s, open, toggle, current }: { s: Slot; open: boolean; toggle: () => void; current: boolean }) {
   const d = data.value!, plan = planFor(d), custom = isCustom(plan), force = strengthDays(plan)
@@ -61,6 +62,7 @@ export function PlanView() {
     const name = phaseName(plan, s.phase), g = groups.at(-1)
     if (g?.name === name) g.slots.push(s); else groups.push({ name, slots: [s] })
   }
+  const lastTest = [...d.tests].sort((a, b) => a.date.localeCompare(b.date)).at(-1)
   const skipped = d.state.skips.length, reps = d.state.repeats.length, idx = slotForDate(t, today) ? t.slots.indexOf(cur) : -1
   return (
     <div class="stack">
@@ -69,6 +71,7 @@ export function PlanView() {
         <div class="goal-h"><h2>{custom ? plan.meta.name : 'Maratona graduale'}</h2>{idx >= 0 && <span>sett. {idx + 1} di {shown.length}</span>}</div>
         <div class="bar" aria-hidden="true"><i style={{ width: `${Math.max(2, (idx + 1) / shown.length * 100)}%` }} /></div>
         <a class="card-l in" href="#/gara"><span><b>{d.state.raceDate ? `Gara il ${fmtDate(d.state.raceDate, { day: 'numeric', month: 'long', year: 'numeric' })}${d.state.raceName ? `, ${d.state.raceName}` : ''}` : 'Gara: scegli la data'}</b><small>{d.state.raceDate ? 'Gara e calendario' : custom ? `Fine del piano il ${fmtDate(t.earliestRace, { day: 'numeric', month: 'long', year: 'numeric' })}` : `Maratona possibile dal ${fmtDate(t.earliestRace, { day: 'numeric', month: 'long', year: 'numeric' })}`}</small></span><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg></a>
+        <a class="card-l in" href="#/test"><span><b>Test e condizione</b><small>{lastTest ? `Ultimo: ${testInfo(lastTest.kind)?.name ?? lastTest.kind}, ${fmtDate(lastTest.date, { day: 'numeric', month: 'short' })}` : 'Scala, Cooper, 5 km e cammino'}</small></span><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg></a>
         {(skipped > 0 || reps > 0) && <p class="sub">{skipped} {skipped === 1 ? 'settimana saltata' : 'settimane saltate'}, {reps} {reps === 1 ? 'ripetuta' : 'ripetute'}. <button class="link" onClick={() => saveState({ ...d.state, skips: [], repeats: [] })}>Annulla tutto</button></p>}
       </section>
       {groups.length > 1 && <nav class="phases" aria-label="Fasi">{groups.map((g, i) => <button type="button" key={i} class={g.slots.includes(cur) ? 'sel' : ''} onClick={() => document.getElementById('fase-' + i)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>{g.name}</button>)}</nav>}

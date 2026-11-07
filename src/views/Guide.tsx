@@ -44,7 +44,7 @@ function useGps(on: boolean, sink: (m: number, alt?: number | null) => void) {
 }
 const GPS_TEXT: Record<Gps, string> = { off: '', cerco: 'Cerco il GPS', ok: 'GPS pronto', debole: 'GPS debole', negato: 'GPS non disponibile' }
 
-function Player({ steps, sig, title, mode, regUrl, sport, auto }: { steps: GStep[]; sig: string; title: string; mode: Mode; regUrl: string; sport: Sport; auto?: boolean }) {
+function Player({ steps, sig, title, mode, regUrl, sport, auto, cta = 'Registra allenamento' }: { steps: GStep[]; sig: string; title: string; mode: Mode; regUrl: string; sport: Sport; auto?: boolean; cta?: string }) {
   const saved = useMemo(() => { const s = local.get<Saved>(KEY); return s?.sig === sig ? s : null }, [sig])
   const st = useRef<GuideState>(saved?.st ?? startGuide()), last = useRef<number | null>(null), pendingM = useRef(0)
   const trace = useRef<Trace>(saved?.trace ?? []), alt = useRef<number | null>(null), mark = useRef(0), kmSaid = useRef(Math.floor((saved?.st.dist ?? 0) / 1000))
@@ -119,7 +119,7 @@ function Player({ steps, sig, title, mode, regUrl, sport, auto }: { steps: GStep
     }
     return <div class="stack"><section class="hero"><p class="eyebrow">{title}</p><h1>Finito</h1>
       <div class="stats run"><div><b>{timeOf(seconds) ?? `0'00"`}</b><span>tempo</span></div><div><b>{km ?? '-'}</b><span>km{!useGpsNow && km ? ' previsti' : ''}</span></div><div><b>{paceOf(km, seconds)?.replace('/km', '') ?? '-'}</b><span>al km</span></div></div>
-      <button class="btn" onClick={save}>Registra allenamento</button></section>
+      <button class="btn" onClick={save}>{cta}</button></section>
       {!useGpsNow && <Note>{swim ? 'I metri sono quelli previsti: correggili se hai nuotato di più o di meno.' : "Con l'orologio i dati esatti sono nel suo file: puoi caricarlo nella pagina di registrazione."}</Note>}
       <section><h2 class="phase">Tratti</h2><table class="splits"><tbody>{s.laps.map((l, i) => <tr key={i}><td>{l.label}</td><td>{clock(l.sec)}</td><td>{l.m ? `${kmText(l.m)}${l.m >= 1000 ? ' km' : ' m'}` : ''}</td></tr>)}</tbody></table></section>
     </div>
@@ -168,7 +168,7 @@ export function GuideView({ route }: { route: string }) {
   const d = data.value!, q = new URLSearchParams(route.split('?')[1] ?? ''), key = q.get('key'), date = q.get('date')
   const ses = useMemo(() => { if (!key) return null; const plan = planFor(d); for (const s of buildTimeline(plan, d.state).slots) for (const x of s.sessions) if (sessionKey(s, x.day) === key) return x; return null }, [key])
   const free = useMemo(() => {
-    if (q.get('free')) return local.get<{ blocks: Block[]; text: string; sport?: Sport }>(FREE)
+    if (q.get('free')) return local.get<{ blocks: Block[]; text: string; sport?: Sport; back?: string }>(FREE)
     if (q.get('workout')) return (d.workouts ?? []).find(w => w.id === q.get('workout')) ?? null
     if (q.get('planned')) return (d.state.planned ?? []).find(p => p.id === q.get('planned')) ?? null
     return null
@@ -179,9 +179,11 @@ export function GuideView({ route }: { route: string }) {
   const [mode, setMode] = useState<Mode>(d.state.watch || swim ? 'watch' : 'gps'), [start, setStart] = useState(() => fromSaved(sig) || !!q.get('go'))
   if (!blocks) return <div class="stack"><section class="head"><h1>Seduta non guidabile</h1><p>Questa seduta non ha blocchi. Puoi costruirne una adesso.</p></section><a class="btn" href="#/costruisci">Costruisci allenamento</a></div>
   const pl = q.get('planned') ? free as any : null, linked = key ?? (pl ? plannedKey(pl) : null), when = date ?? pl?.date
-  const reg = `#/registra?${linked ? `key=${encodeURIComponent(linked)}&date=${when}&` : ''}type=${swim ? 'nuoto' : 'corsa'}&guide=1`
+  // un test torna alla sua pagina per inserire il risultato, invece di passare dalla registrazione
+  const back = q.get('free') ? (free as any)?.back as string | undefined : undefined
+  const reg = back ? `#/${back}` : `#/registra?${linked ? `key=${encodeURIComponent(linked)}&date=${when}&` : ''}type=${swim ? 'nuoto' : 'corsa'}&guide=1`
   const m = local.get<Saved>(KEY)
-  if (start) return <Player steps={steps} sig={sig} title={title} mode={m?.sig === sig ? m.mode : mode} regUrl={reg} sport={sport} auto={!!q.get('go') && !fromSaved(sig)} />
+  if (start) return <Player steps={steps} sig={sig} title={title} mode={m?.sig === sig ? m.mode : mode} regUrl={reg} sport={sport} auto={!!q.get('go') && !fromSaved(sig)} cta={back ? 'Inserisci il risultato' : undefined} />
   const warm = warmupFor(title), cool = cooldownFor(title, ses?.km), art = swim ? null : learnFor(title), hasWarm = blocks.some(b => b.kind === 'warm')
   return <div class="stack form">
     <section class="head"><p class="eyebrow">Allenamento guidato</p><h1>{title}</h1>{ses && (ses.fiato || ses.fatica) && <p>{[ses.fiato, ses.fatica ? `fatica ${ses.fatica}` : null].filter(Boolean).join(', ')}</p>}</section>
@@ -194,6 +196,6 @@ export function GuideView({ route }: { route: string }) {
     {art && <a class="btn ghost" href={`#/impara/${art.id}`}>Cos'è: {art.title}</a>}
     {!swim && <a class="btn ghost" href={`#/routine?id=${cool.id}`}>Dopo: {cool.name}</a>}
     {ses && <SaveSession s={ses} />}
-    {reg && <button type="button" class="link" onClick={() => nav(reg.slice(2).replace('guide=1', '').replace(/&$/, ''))}>Registra senza guida</button>}
+    {reg && !back && <button type="button" class="link" onClick={() => nav(reg.slice(2).replace('guide=1', '').replace(/&$/, ''))}>Registra senza guida</button>}
   </div>
 }
