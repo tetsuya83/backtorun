@@ -114,7 +114,7 @@ function Editor({ edit, query }: { edit?: Route; query: URLSearchParams }) {
         {fit && <><div class="rt-bar"><i class={fit.ok ? 'ok' : ''} style={{ width: `${fit.ratio * 100}%` }} /></div><p class={fit.ok ? 'rt-ok' : 'sub'}>{fit.text}</p></>}
         <p class="sub">{gain != null ? `Dislivello ${gain} m` : 'Dislivello non disponibile'}</p>
       </section>
-      {!linked && <Note>Per seguire strade e sentieri collega <a href="#/impostazioni">openrouteservice in Profilo</a>. La <a href="#/aiuto">Guida</a> spiega come fare.</Note>}
+      {!linked && <Note>Per seguire strade e sentieri collega <a href="#/impostazioni/percorsi">openrouteservice in Profilo</a>. La <a href="#/aiuto">Guida</a> spiega come fare.</Note>}
       {linked && !online.value && <Note>Serve la connessione per disegnare.</Note>}
       {busy && <p class="sub pad">Calcolo il tratto…</p>}
       {err && <p class="err pad">{err}</p>}
@@ -145,7 +145,6 @@ export function RoutingSettings() {
   const connect = (e: Event) => { e.preventDefault(); void run(async () => { await call('PUT', '/api/routing/key', { key }); setKey(''); setRoutingLinked(true) }) }
   const remove = () => { if (confirm('Scollegare openrouteservice? La chiave viene cancellata, i percorsi salvati restano.')) void run(async () => { await call('DELETE', '/api/routing/key'); setRoutingLinked(false) }) }
   return <>
-    <h2 class="phase">Percorsi</h2>
     {on ? <>
       <p class="sub pad">Collegato a openrouteservice: i percorsi seguono strade e sentieri.</p>
       <button type="button" class="btn ghost danger" disabled={busy} onClick={remove}>Scollega</button>

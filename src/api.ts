@@ -40,6 +40,17 @@ const enqueue = (op: Op) => {
   store.set('btr-queue', queue); pending.value = queue.length; void flush()
 }
 const commit = (d: Data) => { data.value = d; store.set('btr-data', d) }
+/** Mostra subito i dati già salvati sul telefono, se ci sono: l'aggiornamento dal server arriva dopo. */
+export function loadCached() {
+  const cached = store.get<Data | null>('btr-data', null)
+  if (cached) data.value = cached
+  return !!cached
+}
+/** Aggiorna dal server in sottofondo: 401 vuol dire che serve un nuovo accesso. */
+export async function refresh() {
+  await flush()
+  commit(await call<Data>('GET', '/api/bootstrap'))
+}
 export async function load() {
   const cached = store.get<Data | null>('btr-data', null)
   if (cached) data.value = cached

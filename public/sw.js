@@ -16,7 +16,15 @@ self.addEventListener('fetch', e => {
   }
   if (e.request.method !== 'GET' || u.origin !== location.origin || u.pathname.startsWith('/api/')) return
   if (e.request.mode === 'navigate') {
-    e.respondWith(fetch(e.request).then(r => { caches.open(V).then(c => c.put('/', r.clone())); return r.clone() }).catch(() => caches.match('/')))
+    // con rete lenta non si aspetta: dopo 2,5 secondi si apre la copia salvata, la nuova arriva alla prossima apertura
+    const net = fetch(e.request).then(r => { if (r.ok) { const c = r.clone(); caches.open(V).then(x => x.put('/', c)) } return r })
+    e.respondWith((async () => {
+      net.catch(() => {})
+      const saved = await caches.match('/')
+      if (!saved) return net
+      const slow = new Promise(ok => setTimeout(() => ok(saved), 2500))
+      return Promise.race([net.catch(() => saved), slow])
+    })())
     return
   }
   e.respondWith(caches.match(e.request).then(hit => hit || fetch(e.request).then(r => {

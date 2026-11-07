@@ -52,7 +52,7 @@ export function IntervalsSettings() {
   return <>
     <h2 class="phase">Importazione automatica</h2>
     {on ? <>
-      <p class="sub pad">Collegato a Intervals.icu. Quando apri l'app, i nuovi allenamenti compaiono in Home e li confermi tu.</p>
+      <p class="sub pad">Collegato a Intervals.icu. Quando apri l'app, i nuovi allenamenti compaiono in Oggi e li confermi tu.</p>
       <div class="row"><button type="button" class="btn ghost" disabled={busy} onClick={check}>Controlla ora</button><button type="button" class="btn ghost danger" disabled={busy} onClick={remove}>Scollega</button></div>
     </> : <form class="stack" onSubmit={connect}>
       <p class="sub pad">Collega l'orologio a un account <a href="https://intervals.icu" target="_blank" rel="noopener">Intervals.icu</a> gratuito, poi copia qui la chiave API che trovi in fondo alle sue impostazioni. Trattala come una password.</p>

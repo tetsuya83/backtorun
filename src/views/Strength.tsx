@@ -81,7 +81,7 @@ export function Strength({ route }: { route: string }) {
     if (!sets.length) { setErr('Spunta almeno una serie.'); return }
     if (fatica == null) { setErr('Indica la fatica.'); return }
     saveActivity(withPains({ id: uid(), date, type: 'forza' as const, source: 'manuale' as const, seconds: Math.min(4 * 3600, Math.round((Date.now() - d.start) / 1000)), fatica, note: note.trim() || null, sets }, pains))
-    local.del(KEY); nav('oggi')
+    local.del(KEY); nav('home')
   }
   const last = [...app.activities].reverse().find(a => a.type === 'corsa')
   if (stale) return <div class="stack"><section class="head"><h1>Seduta non salvata</h1><p>Hai una scheda di forza aperta del {fmtDate(d.date, { day: 'numeric', month: 'long' })}.</p></section>

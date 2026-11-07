@@ -6,7 +6,7 @@ import { addFix, newTrack } from '../../shared/gps'
 import { hrMaxOf, kmSplits, zoneHint, zonesFrom } from '../../shared/analysis'
 import { cooldownFor, totalOf, warmupFor } from '../../shared/training'
 import { buzz, clearScheduled, keepAwake, local, say, schedule, unlockSound, type Cue } from '../sound'
-import { BlockList, nav, Note } from '../ui'
+import { BlockList, goBack, nav, Note } from '../ui'
 import { timeOf, paceOf } from '../fit'
 import { learnFor } from '../learn'
 import type { Activity } from '../../shared/engine'
@@ -44,12 +44,14 @@ function useGps(on: boolean, sink: (m: number, alt?: number | null) => void) {
 }
 const GPS_TEXT: Record<Gps, string> = { off: '', cerco: 'Cerco il GPS', ok: 'GPS pronto', debole: 'GPS debole', negato: 'GPS non disponibile' }
 
-function Player({ steps, sig, title, mode, regUrl, sport }: { steps: GStep[]; sig: string; title: string; mode: Mode; regUrl: string; sport: Sport }) {
+function Player({ steps, sig, title, mode, regUrl, sport, auto }: { steps: GStep[]; sig: string; title: string; mode: Mode; regUrl: string; sport: Sport; auto?: boolean }) {
   const saved = useMemo(() => { const s = local.get<Saved>(KEY); return s?.sig === sig ? s : null }, [sig])
   const st = useRef<GuideState>(saved?.st ?? startGuide()), last = useRef<number | null>(null), pendingM = useRef(0)
   const trace = useRef<Trace>(saved?.trace ?? []), alt = useRef<number | null>(null), mark = useRef(0), kmSaid = useRef(Math.floor((saved?.st.dist ?? 0) / 1000))
   const [, tick] = useState(0), [run, setRun] = useState(false), [locked, setLocked] = useState(false), [ended, setEnded] = useState(false)
   const sleep = useRef<null | (() => void)>(null), hold = useRef<any>(null), near = useRef(-1)
+  const [count, setCount] = useState<number | null>(auto && !saved ? 3 : null)
+  useImmersive()
   const useGpsNow = mode === 'gps'
   const gps = useGps(useGpsNow, (m, a) => { if (a != null) alt.current = a; if (last.current != null) pendingM.current += m })
   const hr = useMemo(() => { const m = hrMaxOf(data.value!); return m ? zonesFrom(m) : null }, [])
@@ -90,6 +92,13 @@ function Player({ steps, sig, title, mode, regUrl, sport }: { steps: GStep[]; si
     tick(n => n + 1)
   }
   useEffect(() => { const iv = setInterval(() => { if (last.current != null) step() }, 500); return () => { clearInterval(iv); clearScheduled(); sleep.current?.() } }, [sig])
+  // Parti dalla Home: tre secondi per mettere il telefono in tasca, poi si va da soli
+  useEffect(() => {
+    if (count == null) return
+    if (count === 0) { setCount(null); go(); return }
+    buzz(80); const t = setTimeout(() => setCount(c => c == null ? null : c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [count])
   const go = () => { unlockSound(); gps.reset(); last.current = Date.now(); sleep.current ??= keepAwake(); setRun(true); setLocked(useGpsNow); store(); queue(); say(steps[st.current.i].label); tick(n => n + 1) }
   const pause = () => { step(); last.current = null; pendingM.current = 0; clearScheduled(); sleep.current?.(); sleep.current = null; setRun(false); store() }
   const next = () => { // Fatto o Salta: con l'orologio il tratto vale quanto previsto
@@ -115,29 +124,42 @@ function Player({ steps, sig, title, mode, regUrl, sport }: { steps: GStep[]; si
       <section><h2 class="phase">Tratti</h2><table class="splits"><tbody>{s.laps.map((l, i) => <tr key={i}><td>{l.label}</td><td>{clock(l.sec)}</td><td>{l.m ? `${kmText(l.m)}${l.m >= 1000 ? ' km' : ' m'}` : ''}</td></tr>)}</tbody></table></section>
     </div>
   }
+  const close = () => { if (run && !confirm('Uscire dalla seduta? La ritrovi in pausa quando torni.')) return; if (run) pause(); setCount(null); goBack('home') }
+  const segs = steps.map((x, i) => ({ w: x.sec ?? (x.m ?? 0) / 3, on: i < s.i ? 'done' : i === s.i ? 'now' : '' }))
   return (
-    <div class="stack timer" data-tone={c.tone}>
-      <p class="eyebrow">{title}</p>
-      {useGpsNow && <span class={'gps ' + (gps.status === 'ok' ? 'ok' : gps.status === 'negato' || gps.status === 'debole' ? 'bad' : '')} role="status">{GPS_TEXT[gps.status]}</span>}
+    <div class="stack timer full" data-tone={c.tone}>
+      <div class="tm-top">
+        <button type="button" class="round" aria-label="Chiudi" onClick={close}><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
+        <p class="eyebrow">{title}</p>
+        {useGpsNow ? <span class={'gps ' + (gps.status === 'ok' ? 'ok' : gps.status === 'negato' || gps.status === 'debole' ? 'bad' : '')} role="status">{GPS_TEXT[gps.status]}</span> : <span class="gps">{swim ? 'Vasca' : 'Orologio'}</span>}
+      </div>
+      <div class="tm-segs" aria-hidden="true">{segs.map((x, i) => <i key={i} class={x.on} style={{ flexGrow: Math.max(x.w, 1) }} />)}</div>
       <section class="tm" aria-live="off">
+        {count != null ? <><p class="tm-label">Si parte tra</p><p class="tm-time">{count}</p><p class="sub">{c.label}: {stepText(c).replace(c.label + ' ', '')}</p></> : <>
         <p class="tm-label">{c.label}</p>
         {byDist && !tap ? <p class="tm-time">{kmText(left.m!)}<small>{left.m! >= 1000 ? ' km' : ' m'}</small></p> : tap ? <p class="tm-time">{kmText(c.m!)}<small>{c.m! >= 1000 ? ' km' : ' m'}</small></p> : <p class="tm-time">{clock(left.sec ?? 0)}</p>}
         {byDist && <p class="sub">{tap ? `${swim ? 'Tocca Fatto a fine tratto' : "Guarda l'orologio e tocca Fatto"}. Sei a ${clock(s.t)}` : `Da ${clock(s.t)}`}{c.sec ? `, massimo ${clock(c.sec)}` : ''}</p>}
         {c.cue && <p class="tm-cue">{c.cue}</p>}
-        {hint && <p class="zonehint">{hint}</p>}
-        <div class="tm-bar"><i style={{ width: `${guideProgress(steps, s) * 100}%` }} /></div>
-        <p class="sub">{after ? `Poi: ${stepText(after)}` : 'Ultimo tratto'}. In tutto {clock(s.total)}{useGpsNow && s.dist > 0 ? `, ${kmText(s.dist)}${s.dist >= 1000 ? ' km' : ' m'}` : ''}</p>
+        {hint && <p class="zonehint">{hint}</p>}</>}
       </section>
-      <div class="row">
-        {run ? <button class="btn" onClick={pause}>Pausa</button> : <button class="btn" onClick={go}>{s.total > 0 ? 'Riprendi' : 'Avvia'}</button>}
-        <button class={'btn' + (tap ? '' : ' ghost')} onClick={next}>{tap ? 'Fatto' : 'Salta'}</button>
+      <div class="tm-next"><span><small>Poi</small> <b>{after ? stepText(after) : 'Fine'}</b></span><span><small>In tutto</small> <b>{clock(s.total)}{useGpsNow && s.dist > 0 ? ` · ${kmText(s.dist)}${s.dist >= 1000 ? ' km' : ' m'}` : ''}</b></span></div>
+      {gps.status === 'negato' && <Note tone="stop"><strong>Non riesco a usare il GPS.</strong> Controlla il permesso di posizione del browser, oppure chiudi e scegli l'orologio.</Note>}
+      <div class="tm-ctl">
+        <button type="button" class={'btn ghost' + (tap ? ' strong' : '')} onClick={next} disabled={count != null}>{tap ? 'Fatto' : 'Salta tratto'}</button>
+        {count != null ? <button type="button" class="play" aria-label="Parti subito" onClick={() => { setCount(null); go() }}><svg viewBox="0 0 24 24" width="34" height="34" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z" /></svg></button>
+          : run ? <button type="button" class="play" aria-label="Pausa" onClick={pause}><svg viewBox="0 0 24 24" width="34" height="34" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg></button>
+          : <button type="button" class="play" aria-label={s.total > 0 ? 'Riprendi' : 'Avvia'} onClick={go}><svg viewBox="0 0 24 24" width="34" height="34" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z" /></svg></button>}
+        <button type="button" class="round" aria-label="Blocca lo schermo" onClick={() => setLocked(true)} disabled={!run}><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg></button>
       </div>
-      {s.total > 0 && <button class="btn ghost" onClick={finish}>Termina qui</button>}
-      {gps.status === 'negato' && <Note tone="stop"><strong>Non riesco a usare il GPS.</strong> Controlla il permesso di posizione del browser, oppure torna indietro e scegli l'orologio.</Note>}
-      <Note>{swim ? "Lascia il telefono a bordo vasca, al riparo dall'acqua, con l'app aperta e lo schermo acceso. Se compare dolore, fermati." : "Tieni l'app aperta e lo schermo acceso: a telefono bloccato GPS, suoni e vibrazione possono fermarsi. Se compare dolore, cammina e fermati."}</Note>
+      {s.total > 0 && <button type="button" class="link tm-end" onClick={finish}>Termina e registra</button>}
+      <p class="sub tm-note">{swim ? "Telefono a bordo vasca, al riparo dall'acqua, schermo acceso." : "Tieni l'app aperta: a telefono bloccato suoni e GPS possono fermarsi. Se compare dolore, cammina e fermati."}</p>
       {locked && <div class="veil"><button class="btn ghost hold" onPointerDown={() => { hold.current = setTimeout(() => setLocked(false), 800) }} onPointerUp={() => clearTimeout(hold.current)} onPointerLeave={() => clearTimeout(hold.current)} onContextMenu={e => e.preventDefault()}>Tieni premuto per sbloccare</button></div>}
     </div>
   )
+}
+/** Durante la seduta spariscono barra delle schede e intestazione. */
+export function useImmersive() {
+  useEffect(() => { document.documentElement.classList.add('immersive'); return () => document.documentElement.classList.remove('immersive') }, [])
 }
 const fromSaved = (sig: string) => local.get<Saved>(KEY)?.sig === sig
 
@@ -154,12 +176,12 @@ export function GuideView({ route }: { route: string }) {
   const blocks = ses ? blocksOf(ses) : free?.blocks ?? null, title = ses?.text ?? (free as any)?.name ?? free?.text ?? 'Allenamento', sport: Sport = free?.sport ?? 'corsa', swim = sport === 'nuoto'
   const steps = useMemo(() => blocks ? guideSteps(blocks, sport) : [], [blocks]), sig = `g${key ?? q.get('workout') ?? q.get('planned') ?? title}`
   const needsDist = steps.some(s => s.m)
-  const [mode, setMode] = useState<Mode>(d.state.watch || swim ? 'watch' : 'gps'), [start, setStart] = useState(() => fromSaved(sig))
+  const [mode, setMode] = useState<Mode>(d.state.watch || swim ? 'watch' : 'gps'), [start, setStart] = useState(() => fromSaved(sig) || !!q.get('go'))
   if (!blocks) return <div class="stack"><section class="head"><h1>Seduta non guidabile</h1><p>Questa seduta non ha blocchi. Puoi costruirne una adesso.</p></section><a class="btn" href="#/costruisci">Costruisci allenamento</a></div>
   const pl = q.get('planned') ? free as any : null, linked = key ?? (pl ? plannedKey(pl) : null), when = date ?? pl?.date
   const reg = `#/registra?${linked ? `key=${encodeURIComponent(linked)}&date=${when}&` : ''}type=${swim ? 'nuoto' : 'corsa'}&guide=1`
   const m = local.get<Saved>(KEY)
-  if (start) return <Player steps={steps} sig={sig} title={title} mode={m?.sig === sig ? m.mode : mode} regUrl={reg} sport={sport} />
+  if (start) return <Player steps={steps} sig={sig} title={title} mode={m?.sig === sig ? m.mode : mode} regUrl={reg} sport={sport} auto={!!q.get('go') && !fromSaved(sig)} />
   const warm = warmupFor(title), cool = cooldownFor(title, ses?.km), art = swim ? null : learnFor(title), hasWarm = blocks.some(b => b.kind === 'warm')
   return <div class="stack form">
     <section class="head"><p class="eyebrow">Allenamento guidato</p><h1>{title}</h1>{ses && (ses.fiato || ses.fatica) && <p>{[ses.fiato, ses.fatica ? `fatica ${ses.fatica}` : null].filter(Boolean).join(', ')}</p>}</section>

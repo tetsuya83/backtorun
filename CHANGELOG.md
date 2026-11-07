@@ -6,6 +6,32 @@ Numerazione: il numero centrale cresce quando cambia una funzione, l'ultimo quan
 
 Le sezioni ammesse in ogni versione sono Aggiunto, Modificato e Tolto.
 
+## 1.21.0 - 2026-11-07
+
+### Aggiunto
+
+- Diario con tutti gli allenamenti, divisi per settimana e filtrabili per tipo, e il riepilogo del mese.
+- Pagina Gara e calendario nel Piano, con salvataggio solo quando tocchi Salva.
+- Pulsante Indietro in alto nelle pagine interne, che riporta nello stesso punto della pagina precedente.
+- Partenza in un tocco: Parti in Oggi apre il cronometro, conta tre secondi e comincia da solo.
+- Lucchetto per bloccare lo schermo durante la corsa anche con l'orologio.
+
+### Modificato
+
+- Cinque voci in basso: Oggi, Piano, Diario, Impara e Profilo. Allenati e Consulta confluiscono in Oggi, Piano e Diario.
+- Oggi mostra la seduta con Parti e le scorciatoie per riscaldamento, percorso e registrazione a mano; la settimana si tocca e segna i giorni fatti.
+- Cronometro a tutto schermo, senza barra in basso, con pulsante grande e avanzamento della seduta.
+- Registrazione più breve: fiato, fatica con quella attesa, dolori e nota; data, battiti, intertempi e file in Dettagli. Durata in ore, minuti e secondi.
+- Piano con obiettivo, settimana in corso e gara in cima, fasi da toccare e settimane più compatte.
+- Profilo diviso per argomenti, con una pagina per ogni voce.
+- L'app si apre subito con i dati salvati sul telefono e si aggiorna in sottofondo, anche con rete lenta.
+- Il meteo compare solo quando ci sono previsioni.
+
+### Tolto
+
+- Le quattro tessere della Home, che ripetevano le voci in basso.
+- Lo storico parziale di Consulta e l'elenco delle ultime corse in Andamento, ora nel Diario.
+
 ## 1.20.0 - 2026-11-06
 
 ### Aggiunto

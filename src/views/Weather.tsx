@@ -63,9 +63,10 @@ export function WeatherCard() {
   const d = data.value!, p = prefsOf(d), today = todayISO(), tomorrow = addDays(today, 1), key = `${p.gps}|${p.lat}|${p.lon}`
   const [day, setDay] = useState<string | null>(null), f = forecast.value
   useEffect(() => { void refreshWeather() }, [key])
-  if (!hasPlace(p)) return <section class="panel wx"><p class="eyebrow">Meteo</p><h2>Scegli dove corri</h2><p class="sub">Vedrai il meteo all'ora della corsa e come vestirti.</p><a class="btn ghost" href="#/impostazioni">Imposta la località</a></section>
+  if (!hasPlace(p)) return <section class="panel wx"><p class="eyebrow">Meteo</p><h2>Scegli dove corri</h2><p class="sub">Vedrai il meteo all'ora della corsa e come vestirti.</p><a class="btn ghost" href="#/impostazioni/meteo">Imposta la località</a></section>
   const usable = f && hourAt(f, today, dayHour(p, today, today)) ? f : null
-  if (!usable) return <section class="panel wx"><p class="eyebrow">Meteo</p><p class="sub" role="status">{loadingWx.value ? 'Carico le previsioni…' : note.value || 'Meteo non disponibile in questo momento.'}</p>{!loadingWx.value && <button type="button" class="btn ghost" onClick={() => refreshWeather(true)}>Riprova</button>}</section>
+  // senza previsioni il riquadro sparisce: si riprova da solo alla prossima apertura
+  if (!usable) return null
   const sel = day ?? firstDay(d, today)
   return <section class="panel wx" aria-label="Meteo e consigli">
     <p class="eyebrow">Meteo, {usable.place}</p>
@@ -98,7 +99,6 @@ export function WeatherSettings() {
   }
   const hours = Array.from({ length: 24 }, (_, i) => i)
   return <>
-    <h2 class="phase">Meteo</h2>
     <p class="sub pad">{p.city ? `Località: ${p.city}.` : 'Nessuna località scelta.'} La posizione del telefono resta sul telefono: viene inviata, arrotondata, solo al servizio meteo.</p>
     <button type="button" class="btn ghost" disabled={busy} aria-pressed={!!p.gps} onClick={gps}>{p.gps ? 'Usa la posizione del telefono: attivo' : 'Usa la posizione del telefono'}</button>
     <form class="row wx-find" onSubmit={search}>

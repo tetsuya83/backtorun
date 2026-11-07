@@ -29,7 +29,7 @@ export function RunView({ route }: { route: string }) {
       {!tr.length && <p class="sub pad">Carica il file FIT per vedere grafici e intertempi.</p>}
       {hr.length > 1 && <Line pts={hr} {...range(hr, 8)} title={`Frequenza cardiaca${span(hr)} bpm`} unit=" bpm" dots={false} />}
       {inZ && zTot > 0 && <section class="zones"><h2>Tempo in zona</h2>{zones!.map((z, i) => <div class="zn" key={z.id}><span>{z.name}</span><i><u style={{ width: `${inZ[i] / zTot * 100}%` }} /></i><b>{Math.round(inZ[i] / zTot * 100)}%</b></div>)}</section>}
-      {!zones && tr.length > 0 && <p class="sub pad"><a href="#/impostazioni">Imposta la FC massima</a> per vedere il tempo in zona.</p>}
+      {!zones && tr.length > 0 && <p class="sub pad"><a href="#/impostazioni/corpo">Imposta la FC massima</a> per vedere il tempo in zona.</p>}
       {dr && <section class="panel"><h2>Deriva cardiaca: {String(dr.value).replace('.', ',')}%, {dr.level}</h2><p>{dr.level === 'bassa' ? 'Il cuore ha tenuto: nella seconda metà ritmo e battiti sono rimasti allineati.' : 'Nella seconda metà servivano più battiti per lo stesso ritmo.'} Caldo, salite, poco sonno e soste possono alterare il dato: guarda la tendenza, non la singola corsa.</p></section>}
       {km.length > 0 && <section><h2 class="phase">Intertempi</h2><table class="splits"><thead><tr><th>Km</th><th>Tempo</th><th>FC</th></tr></thead><tbody>{km.map(k => <tr key={k.km} class={k.seconds === fastest && varied ? 'best' : ''}><td>{k.partial ? `${k.km}, parziale` : k.km}</td><td>{mmss(k.seconds)}</td><td>{k.hr ?? ''}</td></tr>)}</tbody></table></section>}
       {cad.length > 1 && <Line pts={cad} {...range(cad, 6)} title={`Cadenza${span(cad)}`} unit=" passi/min" dots={false} />}

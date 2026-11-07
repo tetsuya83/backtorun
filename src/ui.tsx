@@ -3,6 +3,9 @@ import { BREATH, breathLevel } from './guide'
 import { upper } from '../shared/engine'
 import { blockSec, blockText, EFFORTS, effortInfo, kindLabel, type Block, type Sport } from '../shared/blocks'
 export const nav = (p: string) => { location.hash = '#/' + p }
+/** Quante pagine dell'app ci sono alle spalle: con zero, Indietro porta alla scheda invece di uscire. */
+export const navDepth = { n: 0 }
+export function goBack(fallback: string) { if (navDepth.n > 0) history.back(); else location.hash = '#/' + fallback }
 export function Gauge({ fiato, fatica }: { fiato?: string | null; fatica?: string | null }) {
   const b = breathLevel(fiato)
   const hi = upper(fatica); const lo = fatica ? +(fatica.match(/\d+/)?.[0] ?? 0) : 0

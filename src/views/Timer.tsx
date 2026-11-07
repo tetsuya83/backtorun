@@ -47,7 +47,7 @@ function Player({ steps, sig, title, note, after, lockable }: { steps: Step[]; s
   }, [sig])
   const s = stepAt(steps, at()), cur = steps[s.i], next = steps[s.i + 1], scene = sceneForStep(cur.label)
   const hold = useRef<any>(null)
-  if (ended) return <div class="stack"><section class="hero"><p class="eyebrow">{title}</p><h1>Finito</h1><p class="sub">{timeOf(Math.round(clk.current.worked)) ?? `0'00"`} di allenamento.</p></section>{after?.(Math.round(clk.current.worked))}<a class="btn ghost" href="#/oggi">Torna ad Allenati</a></div>
+  if (ended) return <div class="stack"><section class="hero"><p class="eyebrow">{title}</p><h1>Finito</h1><p class="sub">{timeOf(Math.round(clk.current.worked)) ?? `0'00"`} di allenamento.</p></section>{after?.(Math.round(clk.current.worked))}<a class="btn ghost" href="#/home">Torna a Oggi</a></div>
   return (
     <div class="stack timer" data-tone={cur.tone}>
       <p class="eyebrow">{title}</p>

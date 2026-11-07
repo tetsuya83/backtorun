@@ -18,7 +18,7 @@ export function Login({ setup, done }: { setup: boolean; done: () => void }) {
       if (mode === 'setup') await call('POST', '/api/setup', { code, name, password: pw })
       else if (mode === 'login') await call('POST', '/api/login', { name, password: pw })
       else await call('POST', '/api/redeem', { code: code0, name, password: pw })
-      if (code0) location.hash = '#/oggi'
+      if (code0) location.hash = '#/home'
       done()
     } catch (x: any) { setErr(x.message ?? 'Controlla la connessione e riprova.') } finally { setBusy(false) }
   }
