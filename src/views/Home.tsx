@@ -1,4 +1,5 @@
-import { data, saveActivity, saveState } from '../api'
+import { addPlanned, data, saveActivity, saveState, uid } from '../api'
+import { nextAdvice, weekAdvice, type Advice } from '../../shared/adapt'
 import { addDays, buildTimeline, isCustom, planFor, reviewWeek, sessionDate, sessionKey, slotForDate, DAYS, strengthDays, type Plan, type Slot } from '../../shared/engine'
 import { blocksOf, sessionTone } from '../../shared/blocks'
 import { painsOf, painText } from '../../shared/pain'
@@ -116,15 +117,36 @@ function TodayCard() {
     {run && sessionMin(ses) >= 60 && <a class="ses-l" href="#/impara/calcolatore-lungo">Cosa portare da mangiare e bere</a>}
   </section>
 }
-/** Ripetere o saltare: i suggerimenti che arrivano dalla settimana appena finita. */
+/** Il piano che si adatta: propone, e cambia solo se confermi. */
+function adviceNow() {
+  const d = data.value!, t = buildTimeline(planFor(d), d.state), today = todayISO(), slot = slotForDate(t, today), seen = d.state.adaptSeen ?? []
+  if (!slot || today < t.slots[0].monday) return { t, slot, week: null, next: null }
+  const idx = t.slots.indexOf(slot), prev = idx > 0 ? t.slots[idx - 1] : undefined, wd = new Date(today + 'T12:00:00Z').getUTCDay()
+  const pendingToday = slot.sessions.some(x => x.km !== 0 && sessionDate(slot, x.day) === today && !d.activities.some(a => a.sessionKey === sessionKey(slot, x.day)))
+  const startedNow = d.activities.some(a => a.date >= slot.monday && a.date <= today && a.type === 'corsa')
+  const ended = wd === 0 && !pendingToday ? slot : wd === 1 && prev && !startedNow ? prev : null
+  const week = ended ? weekAdvice(t, ended, d.activities) : null, next = nextAdvice(t, d.activities, today)
+  return { t, slot, week: week && !seen.includes(week.id) ? week : null, next: next && !seen.includes(next.id) ? next : null }
+}
+function Advise({ a, yes, label }: { a: Advice; yes: () => void; label: string }) {
+  const d = data.value!, no = () => saveState({ ...d.state, adaptSeen: [...(d.state.adaptSeen ?? []), a.id].slice(-60) })
+  return <section class="panel warn adapt" aria-label="Proposta del piano">
+    <p class="eyebrow">Proposta del piano</p>
+    <h2>{a.title}</h2>
+    <ul class="dots">{a.reasons.map(r => <li key={r}><span>{r}</span></li>)}</ul>
+    <p>{a.kind === 'repeat' ? 'Ripetere una settimana costa poco e dà tempo al corpo di adattarsi. Il calendario slitta di una settimana.' : `${fmtDate(a.date!, { weekday: 'long', day: 'numeric' })}: corsa facile di ${a.minutes} minuti al posto di ${a.ses!.text.toLowerCase()}. La seduta del piano torna se annulli la sostituzione.`}</p>
+    <div class="row"><button type="button" class="btn" onClick={yes}>{label}</button><button type="button" class="btn ghost" onClick={no}>Prosegui come previsto</button></div>
+  </section>
+}
 function Review() {
-  const d = data.value!, t = buildTimeline(planFor(d), d.state), today = todayISO(), slot = slotForDate(t, today)
-  if (!slot || today < t.slots[0].monday) return null
-  const idx = t.slots.indexOf(slot), prev = idx > 0 ? t.slots[idx - 1] : undefined, sunday = new Date(today + 'T12:00:00Z').getUTCDay() === 0
+  const d = data.value!, today = todayISO(), { t, slot, week, next } = adviceNow()
+  if (!slot) return null
+  const seen = d.state.adaptSeen ?? [], idx = t.slots.indexOf(slot), prev = idx > 0 ? t.slots[idx - 1] : undefined, sunday = new Date(today + 'T12:00:00Z').getUTCDay() === 0
   const rv = sunday ? reviewWeek(t, slot, d.activities) : prev ? reviewWeek(t, prev, d.activities) : null
   return <>
-    {rv?.overload && <Note><strong>Fatica sopra le attese per due sedute di fila.</strong> Ripeti questa settimana invece di proseguire.</Note>}
-    {rv?.canSkip && rv.next && <section class="panel go">
+    {week && <Advise a={week} label={`Ripeti la settimana ${week.week}`} yes={() => saveState({ ...d.state, repeats: [...d.state.repeats, week.week!], adaptSeen: [...seen, week.id].slice(-60) })} />}
+    {!week && next && <Advise a={next} label="Alleggerisci" yes={() => { addPlanned({ id: uid(), name: 'Seduta alleggerita', sport: 'corsa', text: `Corsa facile ${next.minutes}' (alleggerita)`, km: null, blocks: [{ kind: 'run', part: { sec: next.minutes! * 60, effort: 'easy' } }], fiato: 'Frasi complete', fatica: '3', date: next.date!, mode: 'replace' }); saveState({ ...data.value!.state, adaptSeen: [...seen, next.id].slice(-60) }) }} />}
+    {!week && rv?.canSkip && rv.next && <section class="panel go">
       <h2>Puoi saltare la settimana {rv.next.week}</h2>
       <p>Hai rispettato tutte le condizioni. Se la salti, il calendario si aggiorna da solo.</p>
       <button class="btn" onClick={() => saveState({ ...d.state, skips: [...d.state.skips, rv.next!.week as number] })}>Salta la settimana {rv.next.week}</button>

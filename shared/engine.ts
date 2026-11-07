@@ -13,7 +13,7 @@ export interface Planned extends Omit<Workout, 'updatedAt'> { date: string; mode
 export interface Week { week: number | string; phase: number; scarico: boolean; skippable: boolean; total: number | null; sessions: Session[]; uid?: string; pause?: boolean; edited?: boolean }
 export interface PlanMeta { phases: Record<string, string>; kind?: 'custom'; id?: string; name?: string; strengthDays?: Day[]; goal?: Omit<GoalInput, 'id' | 'resume'> }
 export interface Plan { meta: PlanMeta; weeks: Week[]; maintenance: Week[] }
-export interface State { startDate: string; startWeek: number; skips: number[]; repeats: number[]; raceDate: string | null; raceName?: string | null; mode?: 'base' | 'custom'; hrMax?: number | null; watch?: string | null; zones?: string[] | null; weather?: WeatherPrefs | null; planned?: Planned[]; restart?: boolean; round?: number; other?: Partial<State> | null; baseDays?: BaseDays | null; testRemind?: boolean; testSnooze?: string | null }
+export interface State { startDate: string; startWeek: number; skips: number[]; repeats: number[]; raceDate: string | null; raceName?: string | null; mode?: 'base' | 'custom'; hrMax?: number | null; watch?: string | null; zones?: string[] | null; weather?: WeatherPrefs | null; planned?: Planned[]; restart?: boolean; round?: number; other?: Partial<State> | null; baseDays?: BaseDays | null; testRemind?: boolean; testSnooze?: string | null; adaptSeen?: string[]; watchSync?: boolean; weekPush?: boolean }
 /** Giorni scelti per la Maratona graduale: le sue quattro uscite e la forza. */
 export interface BaseDays { days: Day[]; long: Day; strength: Day[] }
 export interface Activity {

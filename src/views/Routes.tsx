@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { call, data, deleteRoute, online, saveRoute, setRoutingLinked, uid } from '../api'
-import { buildGpx, buildRoute, fitOf, gainOf, isRouteGpx, legsOf, MAX_ROUTES, mirror, parseRouteGpx, type Leg, type LngLat, type Pt, type Route, type RouteSession } from '../../shared/route'
+import { buildGpx, buildRoute, fitOf, gainOf, isRouteGpx, legsOf, MAX_ROUTES, mirror, splitLoop, parseRouteGpx, type Leg, type LngLat, type Pt, type Route, type RouteSession } from '../../shared/route'
 import { Field, Note } from '../ui'
 import { fmtDate, todayISO } from '../guide'
 
@@ -96,6 +96,18 @@ function Editor({ edit, query }: { edit?: Route; query: URLSearchParams }) {
     })
     setWay([...v]) // se il calcolo fallisce il punto torna al suo posto
   }
+  const [want, setWant] = useState(() => String(start.session?.km || 8)), [ideas, setIdeas] = useState<Leg[] | null>(null), [pick, setPick] = useState(-1)
+  const propose = () => {
+    const k = parseFloat(want.replace(',', '.')), from = way[0] ?? center, base = Math.floor(Math.random() * 900)
+    if (!(k >= 1 && k <= 45)) { setErr('Scegli una distanza tra 1 e 45 km.'); return }
+    void guard(async () => {
+      const got = await Promise.allSettled([0, 1, 2].map(i => call<Leg>('POST', '/api/routing/loop', { start: from, km: k, seed: base + i * 31 })))
+      const ok = got.flatMap(g => g.status === 'fulfilled' ? [g.value] : [])
+      if (!ok.length) { const e = got.find(g => g.status === 'rejected') as PromiseRejectedResult; throw e.reason }
+      setIdeas(ok); use(ok[0], 0)
+    })
+  }
+  const use = (l: Leg, i: number) => { const s = splitLoop(l.c); setWay(s.way); setLegs(s.legs); setPick(i) }
   const undo = () => { setErr(''); setWay(w => w.slice(0, -1)); setLegs(l => l.slice(0, -1)) }
   const ring = () => { if (way.length > 1) add(way[0]) }
   const back = () => { if (legs.length) { setLegs(l => [...l, ...mirror(l)]); setWay(v => [...v, ...[...v].reverse().slice(1)]) } }
@@ -119,8 +131,15 @@ function Editor({ edit, query }: { edit?: Route; query: URLSearchParams }) {
       {busy && <p class="sub pad">Calcolo il tratto…</p>}
       {err && <p class="err pad">{err}</p>}
       {full && <p class="err pad">Puoi salvare al massimo {MAX_ROUTES} percorsi. Eliminane uno.</p>}
+      {linked && (way.length < 2 || ideas) && <section class="panel rt-loop">
+        <h2>Proponi un anello</h2>
+        <p class="sub">{way.length ? 'Parte dal punto che hai messo.' : 'Parte da casa, o tocca prima la mappa per scegliere la partenza.'}</p>
+        <div class="row"><Field label="Distanza in km"><input inputMode="decimal" value={want} onInput={e => setWant(e.currentTarget.value)} /></Field><button type="button" class="btn ghost" disabled={busy || !online.value} onClick={propose}>{ideas ? 'Altre tre' : 'Proponi tre anelli'}</button></div>
+        {ideas && <ul class="rt-ideas" role="list">{ideas.map((l, i) => <li key={i}><button type="button" class={i === pick ? 'sel' : ''} aria-pressed={i === pick} onClick={() => use(l, i)}><Thumb track={l.c} /><span><b>Anello {i + 1}</b><small>{km(l.m / 1000)} km{gainOf(l.c) != null ? ` · ${gainOf(l.c)} m` : ''}</small></span></button></li>)}</ul>}
+        {ideas && <p class="sub">Controlla il giro sulla mappa: la proposta può passare su strade poco adatte. Puoi spostare i punti.</p>}
+      </section>}
       <div class="row"><button type="button" class="btn ghost" disabled={way.length < 2 || busy || !linked} onClick={ring}>Chiudi anello</button><button type="button" class="btn ghost" disabled={!legs.length || busy} onClick={back}>Andata e ritorno</button></div>
-      <div class="row"><button type="button" class="btn ghost" disabled={!way.length || busy} onClick={undo}>Annulla punto</button><button type="button" class="btn ghost" disabled={!way.length || busy} onClick={() => { setWay([]); setLegs([]); setErr('') }}>Ricomincia</button></div>
+      <div class="row"><button type="button" class="btn ghost" disabled={!way.length || busy} onClick={undo}>Annulla punto</button><button type="button" class="btn ghost" disabled={!way.length || busy} onClick={() => { setWay([]); setLegs([]); setErr(''); setIdeas(null) }}>Ricomincia</button></div>
       <button type="button" class="btn" disabled={!legs.length || busy || full} onClick={save}>{start.session ? 'Salva e collega alla seduta' : 'Salva'}</button>
     </section>
     <div class="rt-canvas"><p class="rt-tip">Tocca la mappa per aggiungere un punto. Trascinalo per spostarlo.</p><LazyMap track={track} way={way} center={center} edit onTap={add} onMove={move} /></div>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildGpx, buildRoute, fitOf, gainOf, isRouteGpx, legsOf, lengthOf, MAX_TRACK, mirror, parseRouteGpx, routeError, simplify, type Leg, type Pt } from '../shared/route'
+import { splitLoop, buildGpx, buildRoute, fitOf, gainOf, isRouteGpx, legsOf, lengthOf, MAX_TRACK, mirror, parseRouteGpx, routeError, simplify, type Leg, type Pt } from '../shared/route'
 import { parseGpx } from '../shared/track'
 
 const line = (n: number, y = 45.5): Pt[] => Array.from({ length: n }, (_, i) => [9 + i * .001, y, 120 + (i % 5)])
@@ -60,5 +60,16 @@ describe('percorsi', () => {
     expect(fitOf(15, 18)!.text).toBe('Mancano 3 km alla seduta')
     expect(fitOf(20.5, 18)!.text).toBe('2,5 km oltre la seduta')
     expect(fitOf(10, null)).toBeNull()
+  })
+})
+describe('anelli proposti', () => {
+  it('si dividono in tratti che si richiudono sulla partenza', () => {
+    const c: Pt[] = Array.from({ length: 41 }, (_, i) => { const a = i / 40 * 2 * Math.PI; return [9 + Math.sin(a) * .01, 45.5 + (1 - Math.cos(a)) * .007, 100] })
+    const s = splitLoop(c)
+    expect(s.legs.length).toBe(4)
+    expect(s.way.length).toBe(5)
+    expect(s.way[0]).toEqual(s.way[4])
+    expect(s.legs.reduce((n, l) => n + l.m, 0)).toBeCloseTo(lengthOf(c), 0)
+    expect(s.legs[1].c[0]).toEqual(s.legs[0].c[s.legs[0].c.length - 1])
   })
 })
