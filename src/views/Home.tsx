@@ -17,6 +17,7 @@ import { unlockSound } from '../sound'
 import { useEffect } from 'preact/hooks'
 import { syncWatch } from '../watchSync'
 import { WhatsNew } from './WhatsNew'
+import { RouteReminder } from './Routes'
 import { suggestTest, testDue, testInfo } from '../../shared/tests'
 
 export const phaseName = (plan: Plan, p: number) => plan.meta.phases[String(p)] ?? 'Piano'
@@ -156,6 +157,11 @@ function Review() {
     </section>}
   </>
 }
+function Reminder() {
+  const d = data.value!, t = buildTimeline(planFor(d), d.state), today = todayISO(), end = addDays(today, 2)
+  const sessions = t.slots.flatMap(s => s.sessions.filter(x => x.km !== 0).map(x => ({ key: sessionKey(s, x.day), date: sessionDate(s, x.day) }))).filter(x => x.date >= today && x.date < end)
+  return <RouteReminder sessions={sessions} today={today} />
+}
 /** Riepilogo della domenica, visibile anche il lunedì. */
 function WeekSummary() {
   const d = data.value!, t = buildTimeline(planFor(d), d.state), today = todayISO(), cur = slotForDate(t, today), wd = new Date(today + 'T12:00:00Z').getUTCDay()
@@ -212,6 +218,7 @@ export function Home() {
     <ImportCard />
     <WeekStrip />
     <TodayCard />
+    <Reminder />
     <Review />
     <WeekSummary />
     <TestReminder />

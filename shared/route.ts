@@ -4,8 +4,11 @@ export type LngLat = [number, number]
 export type Pt = [number, number] | [number, number, number]
 export interface Leg { c: Pt[]; m: number }
 export interface RouteSession { key: string; date: string; label: string; km: number | null }
-export interface Route { id: string; name: string; way: LngLat[]; track: Pt[]; cuts: number[]; km: number; ascent: number | null; source: 'editor' | 'gpx'; session?: RouteSession | null; updatedAt?: number }
+export interface Route { id: string; name: string; way: LngLat[]; track: Pt[]; cuts: number[]; km: number; ascent: number | null; source: 'editor' | 'gpx'; session?: RouteSession | null; updatedAt?: number; sentSig?: string | null; sentAt?: number | null }
 export const MAX_ROUTES = 30
+/** Impronta del percorso: se cambia dopo l'invio, sull'orologio c'è una versione vecchia. */
+export const routeSig = (r: Pick<Route, 'track' | 'km'>) => `${r.track.length}:${r.km}:${r.track[0]?.slice(0, 2).join()}:${r.track[r.track.length - 1]?.slice(0, 2).join()}`
+export const isSent = (r: Route) => !!r.sentSig && r.sentSig === routeSig(r)
 export const MAX_TRACK = 1500
 const near = (a: Pt, b: Pt) => meters({ lat: a[1], lon: a[0] }, { lat: b[1], lon: b[0] })
 export const lengthOf = (c: Pt[]) => c.reduce((n, p, i) => i ? n + near(c[i - 1], p) : 0, 0)

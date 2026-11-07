@@ -98,3 +98,13 @@ describe('fondo degli anelli', () => {
     expect(matchOf(null, ['asfalto'])).toBe(0)
   })
 })
+import { isSent, routeSig } from '../shared/route'
+describe('percorso sull\'orologio', () => {
+  it('risulta inviato finché non lo modifichi', () => {
+    const r = buildRoute('a', 'Giro', [[9, 45.5]], [{ c: [[9, 45.5], [9.01, 45.5]], m: 780 }], 'editor')
+    expect(isSent(r)).toBe(false)
+    const s = { ...r, sentSig: routeSig(r) }
+    expect(isSent(s)).toBe(true)
+    expect(isSent({ ...s, track: [...s.track, [9.02, 45.5] as Pt], km: 1.56 })).toBe(false)
+  })
+})

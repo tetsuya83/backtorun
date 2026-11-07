@@ -13,8 +13,8 @@ Le sezioni ammesse in ogni versione sono Aggiunto, Modificato e Tolto.
 - Il piano ti propone di rallentare quando serve: decidi tu
 - Le corse della settimana arrivano sull'orologio da Intervals.icu
 - Chiedi tre anelli da dove vuoi, sul fondo che preferisci
+- Manda i percorsi al Suunto e segui la navigazione dal polso
 - La domenica trovi il riepilogo della settimana, anche come notifica
-- Dopo ogni aggiornamento, le novità in breve come queste
 
 ### Aggiunto
 
@@ -24,6 +24,8 @@ Le sezioni ammesse in ogni versione sono Aggiunto, Modificato e Tolto.
 - Preferenza di fondo per gli anelli, anche multipla, tra asfalto, sterrato e ghiaia, sentieri e prati, con la quota di ogni fondo per ciascuna proposta.
 - Riepilogo della settimana in Oggi la domenica e il lunedì, e notifica facoltativa la domenica sera.
 - Banner delle novità dopo ogni aggiornamento, con i punti in breve.
+- Invio guidato dei percorsi al Suunto: il file si apre con l'app Suunto, poi Salva e sincronizza. Il percorso risulta inviato finché non lo modifichi.
+- Promemoria in Oggi, il giorno prima e il giorno stesso, per mandare all'orologio il percorso della seduta.
 
 ### Modificato
 

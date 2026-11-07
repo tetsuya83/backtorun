@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
-import { call, data, deleteRoute, online, saveRoute, setRoutingLinked, uid } from '../api'
-import { GROUNDS, rankLoops, type Ground, type Mix, buildGpx, buildRoute, fitOf, gainOf, isRouteGpx, legsOf, MAX_ROUTES, mirror, splitLoop, parseRouteGpx, type Leg, type LngLat, type Pt, type Route, type RouteSession } from '../../shared/route'
+import { call, data, deleteRoute, online, saveRoute, saveState, setRoutingLinked, uid } from '../api'
+import { addDays } from '../../shared/engine'
+import { GROUNDS, isSent, rankLoops, routeSig, type Ground, type Mix, buildGpx, buildRoute, fitOf, gainOf, isRouteGpx, legsOf, MAX_ROUTES, mirror, splitLoop, parseRouteGpx, type Leg, type LngLat, type Pt, type Route, type RouteSession } from '../../shared/route'
 import { Field, Note } from '../ui'
 import { fmtDate, todayISO } from '../guide'
 
@@ -50,19 +51,25 @@ function Detail({ r }: { r: Route }) {
   const [can] = useState(() => { try { return !!navigator.canShare?.({ files: [gpxFile(r)] }) } catch { return false } })
   const download = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(gpxFile(r)); a.download = fileName(r); a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 3e4) }
   const share = () => navigator.share({ files: [gpxFile(r)], title: r.name }).catch(() => undefined)
+  const [step, setStep] = useState(false), sent = isSent(r), garmin = /garmin/i.test(data.value!.state.watch ?? '')
   const remove = () => { if (confirm(`Eliminare ${r.name}?`)) { deleteRoute(r.id); location.hash = '#/percorsi' } }
   return <div class="stack">
     <section class="head"><p class="eyebrow"><a href="#/percorsi">Percorsi</a></p><h1>{r.name}</h1><p>{meta(r)}</p>{r.session && <p class="rt-link">{fmtDate(r.session.date, { weekday: 'long', day: 'numeric', month: 'long' })}: {r.session.label}</p>}</section>
     <div class="cols"><div class="col">
       <LazyMap track={r.track} way={r.way} center={r.way[0] ?? CORNAREDO} />
     </div><div class="col">
-      <button type="button" class="btn" onClick={download}>Scarica il file GPX</button>
+      {sent ? <p class="rt-sent">Sull'orologio dal {new Date(r.sentAt ?? r.updatedAt ?? Date.now()).toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}</p> : r.sentSig && <p class="sub pad">Hai modificato il percorso dopo l'invio: sull'orologio c'è la versione precedente.</p>}
+      <button type="button" class={'btn' + (sent ? ' ghost' : '')} onClick={() => { download(); setStep(true) }}>{garmin ? 'Scarica per Garmin' : sent ? 'Manda di nuovo a Suunto' : 'Manda a Suunto'}</button>
       {can && <button type="button" class="btn ghost" onClick={share}>Condividi</button>}
-      <section class="panel l-sec"><h2>Poi, nell'app Suunto</h2><ol class="nums">
-        <li><span>Apri la <b>mappa</b> e tocca <b>+</b></span></li>
-        <li><span>Scegli <b>Importa percorso</b> e il file scaricato</span></li>
-        <li><span><b>Salva</b> e sincronizza l'orologio</span></li>
-      </ol><p class="sub">Con Garmin: su Garmin Connect dal computer importa il file come percorso, poi invialo all'orologio.</p></section>
+      {garmin ? <section class="panel l-sec"><h2>Poi, con Garmin</h2><ol class="nums">
+        <li><span>Su <b>Garmin Connect</b> dal computer importa il file come percorso</span></li>
+        <li><span>Invialo all'orologio e <b>sincronizza</b></span></li>
+      </ol></section> : <section class={'panel l-sec' + (step ? ' rt-step' : '')}><h2>{step ? 'Ora sul telefono' : 'Come arriva sul Suunto'}</h2><ol class="nums">
+        <li><span>Tocca la <b>notifica del download</b> e apri il file con <b>Suunto</b></span></li>
+        <li><span>Nell'app Suunto controlla il percorso e tocca <b>Salva</b></span></li>
+        <li><span><b>Sincronizza</b> l'orologio: lo trovi tra i percorsi da seguire</span></li>
+      </ol><p class="sub">Se Suunto non compare: nell'app apri la mappa, tocca + e scegli Importa percorso.</p></section>}
+      {step && !sent && <button type="button" class="btn" onClick={() => { saveRoute({ ...r, sentSig: routeSig(r), sentAt: Date.now() }); setStep(false) }}>Fatto, è sull'orologio</button>}
       <div class="row"><a class="btn ghost" href={`#/percorsi/${r.id}/modifica`}>Modifica</a><button type="button" class="btn ghost danger" onClick={remove}>Elimina</button></div>
     </div></div>
   </div>
@@ -199,4 +206,18 @@ export function RoutingSettings() {
     </form>}
     {err && <p class="err pad">{err}</p>}
   </>
+}
+/** In Oggi, il giorno prima e il giorno stesso: un percorso collegato che non è ancora sull'orologio. */
+export function RouteReminder({ sessions, today }: { sessions: { key: string; date: string }[]; today: string }) {
+  const d = data.value!, seen = d.state.adaptSeen ?? [], keys = new Map(sessions.map(x => [x.key, x.date])), tomorrow = addDays(today, 1)
+  const due = (d.routes ?? []).map(r => ({ r, date: r.session ? keys.get(r.session.key) ?? r.session.date : null })).find(x => x.date && (x.date === today || x.date === tomorrow) && !isSent(x.r) && !seen.includes(`route-${x.r.id}-${x.date}`))
+  if (!due) return null
+  const { r, date } = due, garmin = /garmin/i.test(d.state.watch ?? '')
+  return <section class="panel rt-rem" aria-label="Percorso da mandare all'orologio">
+    <p class="eyebrow">{date === today ? 'Oggi' : 'Domani'} corri su un percorso</p>
+    <h2>Manda {r.name} {garmin ? 'al Garmin' : 'al Suunto'}</h2>
+    <p>{km(r.km)} km. Fallo prima di uscire: poi segui la navigazione dall'orologio.</p>
+    <div class="row"><a class="btn" href={`#/percorsi/${r.id}`}>Apri il percorso</a><button type="button" class="btn ghost" onClick={() => saveRoute({ ...r, sentSig: routeSig(r), sentAt: Date.now() })}>È già sull'orologio</button></div>
+    <button type="button" class="link" onClick={() => saveState({ ...d.state, adaptSeen: [...seen, `route-${r.id}-${date}`].slice(-60) })}>Non mi serve</button>
+  </section>
 }
