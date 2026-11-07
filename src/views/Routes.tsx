@@ -134,7 +134,7 @@ function Editor({ edit, query }: { edit?: Route; query: URLSearchParams }) {
   const back = () => { if (legs.length) { setLegs(l => [...l, ...mirror(l)]); setWay(v => [...v, ...[...v].reverse().slice(1)]) } }
   const save = () => {
     const id = edit?.id ?? uid(), n = name.trim() || (start.session?.label ?? 'Nuovo percorso')
-    saveRoute({ ...buildRoute(id, n, way, legs, start.source, start.session) })
+    saveRoute({ ...buildRoute(id, n, way, legs, start.source, start.session), sentSig: edit?.sentSig ?? null, sentAt: edit?.sentAt ?? null }) // l'impronta resta: se il percorso è cambiato, avvisa che sull'orologio c'è la versione vecchia
     location.hash = '#/percorsi/' + id
   }
   return <div class="rt-ed">
