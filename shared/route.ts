@@ -48,12 +48,13 @@ export function legsOf(r: Pick<Route, 'track' | 'cuts'>): Leg[] {
   return r.cuts.map((a, i) => { const c = r.track.slice(a, (r.cuts[i + 1] ?? r.track.length - 1) + 1); return { c, m: lengthOf(c) } })
 }
 /** Divide un anello proposto in tratti, così i punti si possono trascinare come in un percorso disegnato. */
-export function splitLoop(c: Pt[], parts = 4): { way: LngLat[]; legs: Leg[] } {
+/** m è la distanza data dal servizio: i tratti la ripartono, così i km restano quelli della proposta. */
+export function splitLoop(c: Pt[], parts = 4, m?: number): { way: LngLat[]; legs: Leg[] } {
   const acc = [0]; for (let i = 1; i < c.length; i++) acc.push(acc[i - 1] + near(c[i - 1], c[i]))
   const tot = acc[acc.length - 1], idx = [0]
   for (let k = 1; k < parts; k++) { const i = acc.findIndex(x => x >= tot * k / parts); if (i > idx[idx.length - 1] && i < c.length - 1) idx.push(i) }
   idx.push(c.length - 1)
-  const legs = idx.slice(1).map((b, k) => { const s = c.slice(idx[k], b + 1); return { c: s, m: lengthOf(s) } })
+  const k = m && tot ? m / tot : 1, legs = idx.slice(1).map((b, i) => { const s = c.slice(idx[i], b + 1); return { c: s, m: lengthOf(s) * k } })
   return { way: idx.map(i => [c[i][0], c[i][1]] as LngLat), legs }
 }
 export const mirror = (l: Leg[]): Leg[] => [...l].reverse().map(x => ({ c: [...x.c].reverse(), m: x.m }))

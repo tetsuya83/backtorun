@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 import planData from '../shared/plan.json'
 import { defaultState, MAX_WORKOUTS, planError, workoutError } from '../shared/engine'
-import { isStrava, remoteOf } from '../shared/intervals'
+import { isStrava, remoteOf, watchEventError } from '../shared/intervals'
 import { MAX_ROUTES, routeError, type Pt } from '../shared/route'
 
 type Env = { Bindings: { DB: D1Database; SETUP_CODE?: string; INTERVALS_URL?: string; ORS_URL?: string }; Variables: { uid: number } }
@@ -24,6 +24,8 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS workouts (id TEXT NOT NULL, user_id INTEGER NOT NULL, json TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY (user_id, id))`,
   `CREATE TABLE IF NOT EXISTS intervals (user_id INTEGER PRIMARY KEY, api_key TEXT NOT NULL, connected_at INTEGER NOT NULL, skipped TEXT NOT NULL DEFAULT '[]')`,
   `CREATE TABLE IF NOT EXISTS routing (user_id INTEGER PRIMARY KEY, api_key TEXT NOT NULL, connected_at INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS push_subs (endpoint TEXT PRIMARY KEY, user_id INTEGER NOT NULL, json TEXT NOT NULL, created_at INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS app_keys (name TEXT PRIMARY KEY, value TEXT NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS routes (id TEXT NOT NULL, user_id INTEGER NOT NULL, json TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY (user_id, id))`,
   `CREATE TABLE IF NOT EXISTS tests (id TEXT NOT NULL, user_id INTEGER NOT NULL, date TEXT NOT NULL, kind TEXT NOT NULL, json TEXT NOT NULL, PRIMARY KEY (user_id, id))`,
 ]
@@ -151,7 +153,7 @@ const auth = async (c: any, next: any) => {
   if (!s) return c.json({ error: 'Sessione scaduta. Accedi di nuovo.' }, 401)
   c.set('uid', s.user_id); await next()
 }
-for (const p of ['/api/bootstrap', '/api/state', '/api/custom-plan', '/api/activities/*', '/api/tests/*', '/api/workouts/*', '/api/routes/*', '/api/routing/*', '/api/import', '/api/intervals/*', '/api/admin/*']) app.use(p, auth)
+for (const p of ['/api/bootstrap', '/api/state', '/api/custom-plan', '/api/activities/*', '/api/tests/*', '/api/workouts/*', '/api/routes/*', '/api/push/*', '/api/routing/*', '/api/import', '/api/intervals/*', '/api/admin/*']) app.use(p, auth)
 app.use('/api/admin/*', async (c, next) => {
   const u = await c.env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(c.get('uid')).first<{ is_admin: number }>()
   if (!u?.is_admin) return c.json({ error: 'Riservato all\'amministratore.' }, 403)
@@ -177,7 +179,7 @@ app.post('/api/admin/invites', async c => {
 app.delete('/api/admin/users/:id', async c => {
   const id = +c.req.param('id'), db = c.env.DB
   if (id === c.get('uid')) return c.json({ error: 'Non puoi eliminare il tuo account.' }, 400)
-  await db.batch(['sessions', 'state', 'user_plans', 'activities', 'tests', 'workouts', 'invites', 'intervals', 'routing', 'routes'].map(t => db.prepare(`DELETE FROM ${t} WHERE user_id = ?`).bind(id)).concat(db.prepare('DELETE FROM users WHERE id = ?').bind(id)))
+  await db.batch(['sessions', 'state', 'user_plans', 'activities', 'tests', 'workouts', 'invites', 'intervals', 'routing', 'routes', 'push_subs'].map(t => db.prepare(`DELETE FROM ${t} WHERE user_id = ?`).bind(id)).concat(db.prepare('DELETE FROM users WHERE id = ?').bind(id)))
   return c.json({ ok: true })
 })
 
@@ -289,6 +291,26 @@ app.get('/api/intervals/file/:id', async c => {
   if (!r?.ok || !r.body) return c.json({ error: 'File non disponibile.' }, 404)
   return new Response(r.body, { headers: { 'content-type': 'application/octet-stream' } })
 })
+// Le sedute dei prossimi giorni sul calendario di Intervals.icu, che le passa all'orologio. Si toccano solo quelle create da BackToRun.
+const icu = (c: any, key: string, path: string, method: string, body?: unknown) => fetch(`${c.env.INTERVALS_URL ?? 'https://intervals.icu'}/api/v1${path}`, { method, headers: { authorization: 'Basic ' + btoa('API_KEY:' + key), 'content-type': 'application/json', 'user-agent': 'Mozilla/5.0 (compatible; BackToRun)' }, body: body === undefined ? undefined : JSON.stringify(body) })
+app.put('/api/intervals/plan', async c => {
+  const l = await linkOf(c), { from, to, events } = await c.req.json<any>()
+  if (!l) return c.json({ error: 'Collega Intervals.icu in Profilo.' }, 400)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from ?? '') || !/^\d{4}-\d{2}-\d{2}$/.test(to ?? '') || !Array.isArray(events) || events.length > 21 || events.some(watchEventError)) return c.json({ error: 'Sedute non valide.' }, 400)
+  const fail = (r: Response | null) => c.json({ error: r && (r.status === 401 || r.status === 403) ? 'Intervals.icu non accetta la chiave. Ricollegalo in Profilo.' : 'Intervals.icu non risponde. Riprova più tardi.' }, r && (r.status === 401 || r.status === 403) ? 400 : 502)
+  const ext = (id: string) => 'btr-' + id
+  if (events.length) {
+    const r = await icu(c, l.key, '/athlete/0/events/bulk?upsert=true', 'POST', events.map((e: any) => ({ category: 'WORKOUT', type: 'Run', start_date_local: `${e.date}T00:00:00`, name: e.name, description: e.description, external_id: ext(e.id) }))).catch(() => null)
+    if (!r?.ok) return fail(r)
+  }
+  const r = await icu(c, l.key, `/athlete/0/events?oldest=${from}&newest=${to}&category=WORKOUT`, 'GET').catch(() => null)
+  const list = r?.ok ? await r.json<any[]>().catch(() => null) : null
+  if (!Array.isArray(list)) return fail(r)
+  const keep = new Set(events.map((e: any) => ext(e.id)))
+  const old = list.filter(e => typeof e?.external_id === 'string' && e.external_id.startsWith('btr-') && !keep.has(e.external_id) && String(e.start_date_local ?? '').slice(0, 10) >= from)
+  await Promise.all(old.map(e => icu(c, l.key, `/athlete/0/events/${encodeURIComponent(e.id)}`, 'DELETE').catch(() => null)))
+  return c.json({ ok: true, sent: events.length, removed: old.length })
+})
 app.post('/api/intervals/skip/:id', async c => {
   const l = await linkOf(c)
   if (!l) return c.json({ ok: true })
@@ -336,4 +358,52 @@ app.post('/api/routing/leg', async c => {
 })
 app.notFound(c => c.json({ error: 'Non trovato' }, 404))
 app.onError((e, c) => { console.error(e); return c.json({ error: 'Errore del server. Riprova.' }, 500) })
-export default app
+// Notifica della domenica: un avviso senza contenuto, firmato con una chiave VAPID creata la prima volta e tenuta nel database.
+const b64u = (b: ArrayBuffer | Uint8Array) => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+const utf = (s: string) => new TextEncoder().encode(s)
+type Vapid = { pub: string; jwk: JsonWebKey; sub: string }
+async function vapid(db: D1Database, origin?: string): Promise<Vapid | null> {
+  const row = await db.prepare("SELECT value FROM app_keys WHERE name = 'vapid'").first<{ value: string }>()
+  if (row) return JSON.parse(row.value) as Vapid
+  if (!origin) return null
+  const k = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']) as CryptoKeyPair
+  const v = { pub: b64u(await crypto.subtle.exportKey('raw', k.publicKey) as ArrayBuffer), jwk: await crypto.subtle.exportKey('jwk', k.privateKey) as JsonWebKey, sub: origin }
+  await db.prepare("INSERT OR IGNORE INTO app_keys VALUES ('vapid', ?)").bind(JSON.stringify(v)).run()
+  return (await vapid(db))!
+}
+async function pushTo(db: D1Database, v: { pub: string; jwk: JsonWebKey; sub: string }, endpoint: string) {
+  const key = await crypto.subtle.importKey('jwk', v.jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign'])
+  const head = b64u(utf(JSON.stringify({ typ: 'JWT', alg: 'ES256' }))), body = b64u(utf(JSON.stringify({ aud: new URL(endpoint).origin, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: v.sub })))
+  const sig = b64u(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, utf(`${head}.${body}`)))
+  const r = await fetch(endpoint, { method: 'POST', headers: { authorization: `vapid t=${head}.${body}.${sig}, k=${v.pub}`, ttl: '86400', urgency: 'normal', 'content-length': '0' } }).catch(() => null)
+  if (r && (r.status === 404 || r.status === 410)) await db.prepare('DELETE FROM push_subs WHERE endpoint = ?').bind(endpoint).run()
+  return !!r?.ok
+}
+const pushOk = (s: any) => typeof s?.endpoint === 'string' && /^https:\/\/[^\s]{10,900}$/.test(s.endpoint)
+app.get('/api/push/key', async c => c.json({ key: (await vapid(c.env.DB, new URL(c.req.url).origin))!.pub }))
+app.put('/api/push/sub', async c => {
+  const s = (await c.req.json<any>()).sub
+  if (!pushOk(s)) return c.json({ error: 'Iscrizione non valida.' }, 400)
+  const db = c.env.DB, n = await db.prepare('SELECT COUNT(*) n FROM push_subs WHERE user_id = ? AND endpoint != ?').bind(c.get('uid'), s.endpoint).first<{ n: number }>()
+  if ((n?.n ?? 0) >= 5) return c.json({ error: 'Hai già attivato le notifiche su 5 dispositivi.' }, 409)
+  await db.prepare('INSERT INTO push_subs VALUES (?, ?, ?, ?) ON CONFLICT(endpoint) DO UPDATE SET user_id = excluded.user_id, json = excluded.json').bind(s.endpoint, c.get('uid'), JSON.stringify({ endpoint: s.endpoint }), Date.now()).run()
+  return c.json({ ok: true })
+})
+app.delete('/api/push/sub', async c => {
+  const s = await c.req.json<any>()
+  await c.env.DB.prepare('DELETE FROM push_subs WHERE user_id = ? AND endpoint = ?').bind(c.get('uid'), String(s.endpoint ?? '')).run()
+  return c.json({ ok: true })
+})
+app.post('/api/push/test', async c => {
+  const db = c.env.DB, v = await vapid(db, new URL(c.req.url).origin), l = await db.prepare('SELECT endpoint FROM push_subs WHERE user_id = ?').bind(c.get('uid')).all<{ endpoint: string }>()
+  const ok = await Promise.all(l.results.map(x => pushTo(db, v!, x.endpoint)))
+  return ok.some(Boolean) ? c.json({ ok: true }) : c.json({ error: 'La notifica non è partita. Disattivala e riattivala.' }, 502)
+})
+async function weekly(env: { DB: D1Database }) {
+  await ensure(env.DB)
+  const v = await vapid(env.DB)
+  if (!v) return
+  const l = await env.DB.prepare('SELECT endpoint FROM push_subs').all<{ endpoint: string }>()
+  await Promise.all(l.results.map(x => pushTo(env.DB, v, x.endpoint)))
+}
+export default { fetch: app.fetch, scheduled: (_e: ScheduledController, env: { DB: D1Database }, ctx: ExecutionContext) => ctx.waitUntil(weekly(env)) }

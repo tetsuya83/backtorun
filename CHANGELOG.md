@@ -6,6 +6,28 @@ Numerazione: il numero centrale cresce quando cambia una funzione, l'ultimo quan
 
 Le sezioni ammesse in ogni versione sono Aggiunto, Modificato e Tolto.
 
+## 1.23.0 - 2026-11-07
+
+### In breve
+
+- Il piano ti propone di rallentare quando serve: decidi tu
+- Le corse della settimana arrivano sull'orologio da Intervals.icu
+- Chiedi tre anelli della distanza giusta e scegli il tuo
+- La domenica trovi il riepilogo della settimana, anche come notifica
+- Dopo ogni aggiornamento, le novità in breve come queste
+
+### Aggiunto
+
+- Proposte del piano da confermare: ripetere la settimana dopo sedute saltate, fatica sopra le attese o dolore in crescita, e alleggerire la prossima seduta dopo due corse troppo faticose o un dolore.
+- Invio a Intervals.icu delle corse dei prossimi 7 giorni, con battito e intensità per ogni passo, aggiornato quando il piano cambia.
+- Tre proposte di anello nell'editor dei percorsi, dalla distanza della seduta e da casa o dal punto scelto.
+- Riepilogo della settimana in Oggi la domenica e il lunedì, e notifica facoltativa la domenica sera.
+- Banner delle novità dopo ogni aggiornamento, con i punti in breve.
+
+### Modificato
+
+- L'avviso di fatica sopra le attese ora propone di ripetere la settimana con un tocco.
+
 ## 1.22.0 - 2026-11-07
 
 ### Aggiunto

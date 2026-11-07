@@ -1,5 +1,5 @@
 import { addPlanned, data, saveActivity, saveState, uid } from '../api'
-import { nextAdvice, weekAdvice, type Advice } from '../../shared/adapt'
+import { nextAdvice, weekAdvice, weekSummary, type Advice } from '../../shared/adapt'
 import { addDays, buildTimeline, isCustom, planFor, reviewWeek, sessionDate, sessionKey, slotForDate, DAYS, strengthDays, type Plan, type Slot } from '../../shared/engine'
 import { blocksOf, sessionTone } from '../../shared/blocks'
 import { painsOf, painText } from '../../shared/pain'
@@ -14,6 +14,9 @@ import { sessionMin } from '../../shared/tips'
 import { cooldownFor, routineById, totalOf, warmupFor, type Routine } from '../../shared/training'
 import { paceOf, timeOf } from '../fit'
 import { unlockSound } from '../sound'
+import { useEffect } from 'preact/hooks'
+import { syncWatch } from '../watchSync'
+import { WhatsNew } from './WhatsNew'
 import { suggestTest, testDue, testInfo } from '../../shared/tests'
 
 export const phaseName = (plan: Plan, p: number) => plan.meta.phases[String(p)] ?? 'Piano'
@@ -153,6 +156,29 @@ function Review() {
     </section>}
   </>
 }
+/** Riepilogo della domenica, visibile anche il lunedì. */
+function WeekSummary() {
+  const d = data.value!, t = buildTimeline(planFor(d), d.state), today = todayISO(), cur = slotForDate(t, today), wd = new Date(today + 'T12:00:00Z').getUTCDay()
+  if (!cur || today < t.slots[0].monday) return null
+  const slot = wd === 0 ? cur : wd === 1 ? t.slots[t.slots.indexOf(cur) - 1] : null, id = slot ? `sum-${slot.key}` : ''
+  if (!slot || (d.state.adaptSeen ?? []).includes(id)) return null
+  const s = weekSummary(t, slot, d.activities), h = Math.floor(s.minutes / 60), m = s.minutes % 60
+  const rows: [string, string][] = [
+    ['Corse', `${s.done} su ${s.planned}`],
+    ['Chilometri', `${String(s.km).replace('.', ',')}${s.kmPlan ? ` su ${s.kmPlan}` : ''}`],
+    ['Tempo di corsa', h ? `${h} h ${m} min` : `${m} min`],
+    ...(s.fatica != null ? [['Fatica media', `${String(s.fatica).replace('.', ',')}${s.faticaPlan ? `, attesa ${String(s.faticaPlan).replace('.', ',')}` : ''}`] as [string, string]] : []),
+    ['Forza', s.strength === 1 ? '1 seduta' : `${s.strength} sedute`],
+    ...(s.pain ? [['Dolore più alto', `${s.pain.level}, ${s.pain.text.toLowerCase()}`] as [string, string]] : []),
+  ]
+  return <section class="panel sum-w" aria-label="Riepilogo della settimana">
+    <p class="eyebrow">Riepilogo · {weekLabel(slot)}</p>
+    <h2>{s.done >= s.planned ? 'Settimana completa' : s.done ? 'Settimana in parte' : 'Settimana saltata'}</h2>
+    <dl class="sum-g">{rows.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
+    {s.next && wd === 0 && <p class="sub">Prossima: {weekLabel(s.next.slot).toLowerCase()}{s.next.km ? `, ${s.next.km} km` : ''}{s.next.long ? `, il più lungo è ${s.next.long.toLowerCase()}` : ''}.</p>}
+    <button type="button" class="link" onClick={() => saveState({ ...d.state, adaptSeen: [...(d.state.adaptSeen ?? []), id].slice(-60) })}>Chiudi il riepilogo</button>
+  </section>
+}
 /** Test di controllo: facoltativo, ogni 8 settimane, solo se ne hai già fatto uno. */
 function TestReminder() {
   const d = data.value!, plan = planFor(d), t = buildTimeline(plan, d.state), today = todayISO(), slot = slotForDate(t, today)
@@ -176,8 +202,10 @@ function NextRun() {
   return <a class="card-l" href="#/piano"><span><small>Prossima corsa · {fmtDate(next.date, { weekday: 'long', day: 'numeric' })}</small><b>{next.x.text}</b></span><Ic d={ICON.chev} size={16} /></a>
 }
 export function Home() {
+  useEffect(() => { void syncWatch() }, [data.value?.state, data.value?.me?.intervals])
   const d = data.value!, today = todayISO(), [mn, , tip] = MONTHS[+today.slice(5, 7) - 1]
   return <div class="stack">
+    <WhatsNew />
     <section class="home-h"><p>{fmtDate(today)}</p><h1>{d.me?.name ? `Ciao ${name(d.me.name)}` : 'Ciao'}</h1></section>
     <div class="cols"><div class="col">
     <BodyAlerts />
@@ -185,6 +213,7 @@ export function Home() {
     <WeekStrip />
     <TodayCard />
     <Review />
+    <WeekSummary />
     <TestReminder />
     <PlannedToday />
     <NextRun />

@@ -7,6 +7,7 @@ import { Field, Note } from '../ui'
 import { WeatherSettings } from './Weather'
 import { IntervalsSettings } from './Import'
 import { RoutingSettings } from './Routes'
+import { currentSub, disablePush, enablePush, pushSupported } from '../push'
 import { type Activity } from '../../shared/engine'
 import { painText, watchedZones, ZONES } from '../../shared/pain'
 
@@ -78,6 +79,9 @@ export function Settings({ onLogout }: { onLogout: () => void }) {
         <Row href="impostazioni/percorsi" label="Percorsi su mappa" value={me?.routing ? 'Collegati' : 'Da collegare'} />
         <Row href="impostazioni/meteo" label="Meteo" value={st.weather?.city ?? (st.weather?.gps ? 'Posizione del telefono' : 'Da impostare')} />
       </Group>
+      <Group title="Avvisi">
+        <Row href="impostazioni/notifiche" label="Notifica della domenica" />
+      </Group>
       <Group title="Dati e persone">
         <Row href="impostazioni/dati" label="Backup ed esportazione" />
         {me?.isAdmin && <Row href="impostazioni/persone" label="Persone e inviti" />}
@@ -124,7 +128,23 @@ function Watch() {
     <p class="sub pad">Serve a scegliere come misurare la distanza negli allenamenti guidati. I dati si importano da file FIT, GPX o TCX, di qualsiasi marca.</p>
   </>
 }
+function Notifications() {
+  const [on, setOn] = useState<boolean | null>(null), [busy, setBusy] = useState(false), [msg, setMsg] = useState(''), [err, setErr] = useState('')
+  useEffect(() => { currentSub().then(s => setOn(!!s)).catch(() => setOn(false)) }, [])
+  const run = async (f: () => Promise<void>) => { setBusy(true); setErr(''); setMsg(''); try { await f() } catch (e: any) { setErr(e.message ?? 'Operazione non riuscita.') } finally { setBusy(false) } }
+  return <>
+    <p class="sub pad">La domenica sera ricevi un avviso: aprendolo trovi il riepilogo della settimana e le eventuali proposte del piano. Vale per questo dispositivo: attivala su ognuno da cui vuoi riceverla.</p>
+    {!pushSupported() ? <Note>Questo browser non riceve notifiche. Su Android installa l'app dal menu di Chrome e attivala da lì.</Note>
+      : on ? <>
+        <p class="sub pad">Attiva su questo dispositivo.</p>
+        <div class="row"><button type="button" class="btn ghost" disabled={busy} onClick={() => run(async () => { await call('POST', '/api/push/test'); setMsg('Notifica di prova inviata: arriva entro qualche secondo.') })}>Prova la notifica</button><button type="button" class="btn ghost danger" disabled={busy} onClick={() => run(async () => { await disablePush(); setOn(false) })}>Disattiva</button></div>
+      </> : on === false && <button type="button" class="btn" disabled={busy} onClick={() => run(async () => { await enablePush(); setOn(true) })}>Attiva la notifica</button>}
+    {msg && <Note tone="go">{msg}</Note>}
+    {err && <p class="err pad">{err}</p>}
+  </>
+}
 const PAGES: Record<string, [string, () => ComponentChildren]> = {
+  notifiche: ['Notifica della domenica', () => <Notifications />],
   corpo: ['Corpo', () => <><Heart /><Zones /></>],
   orologio: ['Orologio e importazione', () => <><Watch /><IntervalsSettings /></>],
   percorsi: ['Percorsi su mappa', () => <RoutingSettings />],

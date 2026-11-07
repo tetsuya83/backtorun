@@ -32,3 +32,14 @@ self.addEventListener('fetch', e => {
     return r
   })))
 })
+// Notifica della domenica: arriva senza contenuto, il testo è sempre lo stesso.
+self.addEventListener('push', e => e.waitUntil(self.registration.showNotification('BackToRun', { body: "Com'è andata la settimana? Apri il riepilogo e guarda cosa ti aspetta.", icon: '/icon-192.png', badge: '/icon-192.png', tag: 'settimana' })))
+self.addEventListener('notificationclick', e => {
+  e.notification.close()
+  e.waitUntil((async () => {
+    const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+    const w = all.find(c => new URL(c.url).origin === location.origin)
+    if (w) { await w.focus(); return w.navigate('/#/home') }
+    return self.clients.openWindow('/#/home')
+  })())
+})

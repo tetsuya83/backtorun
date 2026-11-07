@@ -71,5 +71,6 @@ describe('anelli proposti', () => {
     expect(s.way[0]).toEqual(s.way[4])
     expect(s.legs.reduce((n, l) => n + l.m, 0)).toBeCloseTo(lengthOf(c), 0)
     expect(s.legs[1].c[0]).toEqual(s.legs[0].c[s.legs[0].c.length - 1])
+    expect(splitLoop(c, 4, 9000).legs.reduce((n, l) => n + l.m, 0)).toBeCloseTo(9000, 3)
   })
 })

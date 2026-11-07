@@ -12,3 +12,6 @@ run_worker_first = ["/api/*"]
 binding = "DB"
 database_name = "backtorun-db"
 database_id = "a6875c6b-2adf-4a52-81bb-56954ff16af5"
+
+[triggers]
+crons = ["0 18 * * SUN"]

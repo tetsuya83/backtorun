@@ -35,3 +35,12 @@ describe('piano che si adatta', () => {
     expect(nextAdvice(t, [run(s3, 'mar', '2026-11-03', { pains: [{ zone: 'ginocchio', level: 5 }] })], '2026-11-03')!.date).toBe('2026-11-05')
   })
 })
+import { weekSummary } from '../shared/adapt'
+describe('riepilogo della settimana', () => {
+  it('somma sedute, km, fatica e prossima settimana', () => {
+    const s = weekSummary(t, s3, [run(s3, 'mar', '2026-11-03', { km: 5, seconds: 1800, fatica: 4 }), run(s3, 'dom', '2026-11-08', { km: 8, seconds: 3000, fatica: 5, pains: [{ zone: 'polpaccio', level: 2 }] }), { id: 'f', date: '2026-11-04', type: 'forza', source: 'manuale' }])
+    expect([s.done, s.planned, s.km, s.kmPlan, s.minutes, s.fatica, s.faticaPlan, s.strength]).toEqual([2, 3, 13, 20, 80, 4.5, 4, 1])
+    expect(s.pain!.level).toBe(2)
+    expect(s.next!.long).toBe('Lungo 50\'')
+  })
+})

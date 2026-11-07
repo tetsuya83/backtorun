@@ -27,3 +27,19 @@ describe('registro delle versioni', () => {
     }
   })
 })
+import { CHANGELOG as ALL, unseen } from '../src/changelog'
+describe('novità in breve', () => {
+  it('ogni nuova versione ha da 1 a 5 punti brevi', () => {
+    expect(ALL[0].brief.length).toBeGreaterThan(0)
+    expect(ALL[0].brief.length).toBeLessThanOrEqual(5)
+    for (const t of ALL[0].brief) expect(t.length).toBeLessThanOrEqual(90)
+  })
+  it('mostra solo le versioni non ancora viste', () => {
+    const l = parseChangelog('## 1.24.0 - 2026-11-10\n\n### In breve\n\n- Due\n\n### Aggiunto\n\n- X\n\n## 1.23.0 - 2026-11-07\n\n### In breve\n\n- Uno\n\n## 1.22.0 - 2026-11-06\n\n### Aggiunto\n\n- Y\n')
+    expect(l[0].changes).toEqual([{ kind: 'Aggiunto', items: ['X'] }])
+    expect(unseen(null, l).map(r => r.version)).toEqual(['1.24.0', '1.23.0'])
+    expect(unseen('1.23.0', l).map(r => r.version)).toEqual(['1.24.0'])
+    expect(unseen('1.24.0', l)).toEqual([])
+    expect(unseen('1.9.0', l).length).toBe(2)
+  })
+})

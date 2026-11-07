@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks'
-import { call, checkImports, data, imports, setIntervalsLinked, skipImport } from '../api'
+import { call, checkImports, data, imports, saveState, setIntervalsLinked, skipImport } from '../api'
+import { syncWatch, watchStatus, type WatchStatus } from '../watchSync'
 import { mergeTarget, pendingImports, type Remote } from '../../shared/intervals'
 import { fmtDate } from '../guide'
 import { paceOf, timeOf } from '../fit'
@@ -35,6 +36,19 @@ export function ImportCard() {
 }
 
 /** In Profilo: la chiave resta sul server e non torna più sul telefono. */
+/** Le sedute del piano sull'orologio, passando da Intervals.icu. */
+function WatchSync() {
+  const d = data.value!, on = !!d.state.watchSync, [st, setSt] = useState<WatchStatus | null>(watchStatus()), [busy, setBusy] = useState(false)
+  const go = async (force: boolean, off = false) => { setBusy(true); const s = await syncWatch(force, off); if (s) setSt(s); setBusy(false) }
+  const toggle = (v: boolean) => { saveState({ ...d.state, watchSync: v }); void go(true, !v) }
+  return <>
+    <h2 class="phase">Sedute sull'orologio</h2>
+    <label class="check"><input type="checkbox" checked={on} disabled={busy} onChange={e => toggle(e.currentTarget.checked)} /> Manda all'orologio le corse dei prossimi 7 giorni</label>
+    <p class="sub pad">Le carico sul calendario di Intervals.icu quando apri l'app e quando il piano cambia. In Intervals.icu attiva il caricamento degli allenamenti pianificati verso il tuo orologio: i passaggi sono nella <a href="#/aiuto">Guida</a>.</p>
+    {on && <div class="row"><button type="button" class="btn ghost" disabled={busy} onClick={() => go(true)}>{busy ? 'Invio…' : 'Invia ora'}</button></div>}
+    {on && st && (st.err ? <p class="err pad">{st.err}</p> : <p class="sub pad">Ultimo invio: {new Date(st.at).toLocaleString('it-IT', { weekday: 'long', hour: '2-digit', minute: '2-digit' })}, {st.n === 1 ? '1 seduta' : `${st.n} sedute`}.</p>)}
+  </>
+}
 export function IntervalsSettings() {
   const on = !!data.value!.me?.intervals
   const [key, setKey] = useState(''), [busy, setBusy] = useState(false), [msg, setMsg] = useState(''), [err, setErr] = useState('')
@@ -54,6 +68,7 @@ export function IntervalsSettings() {
     {on ? <>
       <p class="sub pad">Collegato a Intervals.icu. Quando apri l'app, i nuovi allenamenti compaiono in Oggi e li confermi tu.</p>
       <div class="row"><button type="button" class="btn ghost" disabled={busy} onClick={check}>Controlla ora</button><button type="button" class="btn ghost danger" disabled={busy} onClick={remove}>Scollega</button></div>
+      <WatchSync />
     </> : <form class="stack" onSubmit={connect}>
       <p class="sub pad">Collega l'orologio a un account <a href="https://intervals.icu" target="_blank" rel="noopener">Intervals.icu</a> gratuito, poi copia qui la chiave API che trovi in fondo alle sue impostazioni. Trattala come una password.</p>
       <Field label="Chiave API di Intervals.icu"><input type="password" autocomplete="off" value={key} onInput={e => setKey(e.currentTarget.value)} required /></Field>

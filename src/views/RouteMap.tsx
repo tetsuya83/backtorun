@@ -6,8 +6,8 @@ import type { LngLat, Pt } from '../../shared/route'
 
 const STYLE = (window as any).BTR_MAP_STYLE ?? 'https://tiles.openfreemap.org/styles/liberty'
 const line = (c: Pt[]) => ({ type: 'Feature' as const, properties: {}, geometry: { type: 'LineString' as const, coordinates: c.map(p => [p[0], p[1]]) } })
-interface Props { track: Pt[]; way: LngLat[]; center: LngLat; edit?: boolean; onTap?: (p: LngLat) => void; onMove?: (i: number, p: LngLat) => void }
-export function RouteMap({ track, way, center, edit, onTap, onMove }: Props) {
+interface Props { track: Pt[]; way: LngLat[]; center: LngLat; fit?: number; edit?: boolean; onTap?: (p: LngLat) => void; onMove?: (i: number, p: LngLat) => void }
+export function RouteMap({ track, way, center, fit, edit, onTap, onMove }: Props) {
   const box = useRef<HTMLDivElement>(null), map = useRef<maplibregl.Map | null>(null), marks = useRef<maplibregl.Marker[]>([])
   const cb = useRef({ onTap, onMove }), [ready, setReady] = useState(false), [bad, setBad] = useState(false)
   cb.current = { onTap, onMove }
@@ -39,5 +39,10 @@ export function RouteMap({ track, way, center, edit, onTap, onMove }: Props) {
       return k
     })
   }, [track, way, ready, edit])
+  useEffect(() => { // una proposta appena scelta si vede tutta
+    const m = map.current
+    if (!m || !ready || !fit || track.length < 2) return
+    const b = new maplibregl.LngLatBounds(); track.forEach(p => b.extend([p[0], p[1]])); m.fitBounds(b, { padding: 44, duration: 300 })
+  }, [fit, ready])
   return bad ? <div class="rt-map rt-off"><p>La mappa non si apre su questo browser.</p></div> : <div ref={box} class="rt-map" role="application" aria-label="Mappa del percorso" />
 }

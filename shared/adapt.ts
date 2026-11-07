@@ -40,3 +40,20 @@ export function nextAdvice(t: Timeline, acts: Activity[], today: string): Advice
   const minutes = Math.max(15, Math.min(45, Math.round(sessionMin(next.x) * .6 / 5) * 5))
   return { id: `light-${next.key}`, kind: 'lighten', title: 'Alleggerisci la prossima seduta', reasons, date: next.date, ses: next.x, minutes }
 }
+
+export interface Summary { done: number; planned: number; km: number; kmPlan: number | null; minutes: number; fatica: number | null; faticaPlan: number | null; pain: { level: number; text: string } | null; strength: number; next: { slot: Slot; km: number | null; long: string | null } | null }
+/** I numeri della settimana, per il riepilogo della domenica. */
+export function weekSummary(t: Timeline, slot: Slot, acts: Activity[]): Summary {
+  const plan = runs(slot), done = plan.map(x => acts.find(a => a.sessionKey === sessionKey(slot, x.day))), end = addDays(slot.monday, 7)
+  const week = acts.filter(a => a.date >= slot.monday && a.date < end), run = week.filter(a => a.type === 'corsa')
+  const fat = done.filter(a => a?.fatica != null).map(a => a!.fatica!), tgt = plan.map(x => upper(x.fatica)).filter((x): x is number => x != null)
+  const avg = (l: number[]) => l.length ? Math.round(l.reduce((a, b) => a + b, 0) / l.length * 10) / 10 : null
+  const top = run.map(worst).filter(p => p && p.level > 0).sort((a, b) => b!.level - a!.level)[0]
+  const nx = t.slots[t.slots.indexOf(slot) + 1], long = nx ? [...runs(nx)].sort((a, b) => (b.km ?? 0) - (a.km ?? 0))[0] : null
+  return {
+    done: done.filter(Boolean).length, planned: plan.length, km: Math.round(run.reduce((n, a) => n + (a.km ?? 0), 0) * 10) / 10, kmPlan: slot.total,
+    minutes: Math.round(run.reduce((n, a) => n + (a.seconds ?? 0), 0) / 60), fatica: avg(fat), faticaPlan: avg(tgt),
+    pain: top ? { level: top.level, text: painText(top) } : null, strength: week.filter(a => a.type === 'forza').length,
+    next: nx ? { slot: nx, km: nx.total, long: long?.text ?? null } : null,
+  }
+}
