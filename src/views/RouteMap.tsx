@@ -39,6 +39,12 @@ export function RouteMap({ track, way, center, fit, edit, onTap, onMove }: Props
       return k
     })
   }, [track, way, ready, edit])
+  const at = center.join()
+  useEffect(() => { // una nuova partenza, da GPS o da casa, si porta al centro della mappa
+    const m = map.current
+    if (m && ready && !edit) return
+    if (m && ready) m.easeTo({ center, duration: 300 })
+  }, [at, ready])
   useEffect(() => { // una proposta appena scelta si vede tutta
     const m = map.current
     if (!m || !ready || !fit || track.length < 2) return

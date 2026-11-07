@@ -74,3 +74,27 @@ describe('anelli proposti', () => {
     expect(splitLoop(c, 4, 9000).legs.reduce((n, l) => n + l.m, 0)).toBeCloseTo(9000, 3)
   })
 })
+import { groundOf, matchOf, mixOf, rankLoops } from '../shared/route'
+describe('fondo degli anelli', () => {
+  it('classifica fondo e tipo di strada', () => {
+    expect(groundOf(3, 3)).toBe('asfalto')
+    expect(groundOf(10, 5)).toBe('sterrato')
+    expect(groundOf(11, 4)).toBe('sentieri')
+    expect(groundOf(0, 4)).toBe('sentieri')
+    expect(groundOf(0, 3)).toBe('asfalto')
+    expect(groundOf(0, 0)).toBe('ignoto')
+  })
+  it('pesa le quote sulla distanza', () => {
+    const c: Pt[] = [[9, 45.5], [9.01, 45.5], [9.02, 45.5], [9.04, 45.5]]
+    const m = mixOf(c, [[0, 2, 3], [2, 3, 10]], [[0, 3, 3]])!
+    expect(m.asfalto).toBe(.5)
+    expect(m.sterrato).toBe(.5)
+    expect(mixOf(c)).toBeNull()
+  })
+  it('mette prima gli anelli più vicini alle preferenze', () => {
+    const a = { m: 8000, mix: { asfalto: .9, sterrato: .1, sentieri: 0, ignoto: 0 } }, b = { m: 9000, mix: { asfalto: .2, sterrato: .5, sentieri: .3, ignoto: 0 } }
+    expect(rankLoops([a, b], ['sterrato', 'sentieri'], 8)[0].m).toBe(9000)
+    expect(rankLoops([b, a], [], 8)[0].m).toBe(8000)
+    expect(matchOf(null, ['asfalto'])).toBe(0)
+  })
+})

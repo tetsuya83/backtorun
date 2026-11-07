@@ -12,7 +12,7 @@ Le sezioni ammesse in ogni versione sono Aggiunto, Modificato e Tolto.
 
 - Il piano ti propone di rallentare quando serve: decidi tu
 - Le corse della settimana arrivano sull'orologio da Intervals.icu
-- Chiedi tre anelli della distanza giusta e scegli il tuo
+- Chiedi tre anelli da dove vuoi, sul fondo che preferisci
 - La domenica trovi il riepilogo della settimana, anche come notifica
 - Dopo ogni aggiornamento, le novità in breve come queste
 
@@ -20,7 +20,8 @@ Le sezioni ammesse in ogni versione sono Aggiunto, Modificato e Tolto.
 
 - Proposte del piano da confermare: ripetere la settimana dopo sedute saltate, fatica sopra le attese o dolore in crescita, e alleggerire la prossima seduta dopo due corse troppo faticose o un dolore.
 - Invio a Intervals.icu delle corse dei prossimi 7 giorni, con battito e intensità per ogni passo, aggiornato quando il piano cambia.
-- Tre proposte di anello nell'editor dei percorsi, dalla distanza della seduta e da casa o dal punto scelto.
+- Tre proposte di anello nell'editor dei percorsi, dalla distanza della seduta, con partenza da casa, dalla posizione del telefono o da un punto della mappa.
+- Preferenza di fondo per gli anelli, anche multipla, tra asfalto, sterrato e ghiaia, sentieri e prati, con la quota di ogni fondo per ciascuna proposta.
 - Riepilogo della settimana in Oggi la domenica e il lunedì, e notifica facoltativa la domenica sera.
 - Banner delle novità dopo ogni aggiornamento, con i punti in breve.
 

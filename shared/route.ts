@@ -93,3 +93,35 @@ export function routeError(r: any): string | null {
   if (typeof r.km !== 'number' || !(r.km >= 0) || r.km > 1000) return 'Percorso non valido.'
   return null
 }
+
+/* Il fondo di un anello, dai dati di openrouteservice: fondo indicato e, quando manca, tipo di strada. */
+export type Ground = 'asfalto' | 'sterrato' | 'sentieri'
+export type Mix = Record<Ground | 'ignoto', number>
+export const GROUNDS: [Ground, string][] = [['asfalto', 'Asfalto'], ['sterrato', 'Sterrato e ghiaia'], ['sentieri', 'Sentieri e prati']]
+const PAVED = [1, 3, 4, 6, 7, 14, 18], LOOSE = [2, 8, 10, 11, 12], SOFT = [15, 17]
+export function groundOf(surface: number, way: number): Ground | 'ignoto' {
+  if (PAVED.includes(surface)) return way === 4 ? 'sentieri' : 'asfalto'
+  if (SOFT.includes(surface)) return 'sentieri'
+  if (LOOSE.includes(surface)) return way === 4 ? 'sentieri' : 'sterrato'
+  if (way === 4) return 'sentieri'
+  if (way === 5) return 'sterrato'
+  if ([1, 2, 3, 6, 7].includes(way)) return 'asfalto'
+  return 'ignoto'
+}
+type Ranges = [number, number, number][]
+const at = (r: Ranges | undefined, i: number) => r?.find(x => i >= x[0] && i < x[1])?.[2] ?? 0
+/** Quote di fondo lungo il percorso, pesate sulla distanza di ogni tratto. */
+export function mixOf(c: Pt[], surface?: Ranges, way?: Ranges): Mix | null {
+  if (!surface && !way) return null
+  const m: Mix = { asfalto: 0, sterrato: 0, sentieri: 0, ignoto: 0 }
+  let tot = 0
+  for (let i = 0; i < c.length - 1; i++) { const d = near(c[i], c[i + 1]); m[groundOf(at(surface, i), at(way, i))] += d; tot += d }
+  if (!tot) return null
+  for (const k of Object.keys(m) as (keyof Mix)[]) m[k] = Math.round(m[k] / tot * 100) / 100
+  return m
+}
+/** Quanto un anello rispetta i fondi scelti: nessuna scelta vale tutto. */
+export const matchOf = (mix: Mix | null | undefined, want: Ground[]) => !want.length ? 1 : mix ? Math.round(want.reduce((n, g) => n + mix[g], 0) * 100) / 100 : 0
+export function rankLoops<T extends { m: number; mix?: Mix | null }>(l: T[], want: Ground[], km: number, n = 3): (T & { match: number })[] {
+  return l.map(x => ({ ...x, match: matchOf(x.mix, want) })).sort((a, b) => b.match - a.match || Math.abs(a.m / 1000 - km) - Math.abs(b.m / 1000 - km)).slice(0, n)
+}

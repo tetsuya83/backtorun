@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { call, data, deleteRoute, online, saveRoute, setRoutingLinked, uid } from '../api'
-import { buildGpx, buildRoute, fitOf, gainOf, isRouteGpx, legsOf, MAX_ROUTES, mirror, splitLoop, parseRouteGpx, type Leg, type LngLat, type Pt, type Route, type RouteSession } from '../../shared/route'
+import { GROUNDS, rankLoops, type Ground, type Mix, buildGpx, buildRoute, fitOf, gainOf, isRouteGpx, legsOf, MAX_ROUTES, mirror, splitLoop, parseRouteGpx, type Leg, type LngLat, type Pt, type Route, type RouteSession } from '../../shared/route'
 import { Field, Note } from '../ui'
 import { fmtDate, todayISO } from '../guide'
 
@@ -77,7 +77,7 @@ function Editor({ edit, query }: { edit?: Route; query: URLSearchParams }) {
     return { name: s ? s.label : '', way: [] as LngLat[], legs: [] as Leg[], source: 'editor' as const, session: s, err: '' }
   })
   const [name, setName] = useState(start.name), [way, setWay] = useState<LngLat[]>(start.way), [legs, setLegs] = useState<Leg[]>(start.legs), [busy, setBusy] = useState(false), [err, setErr] = useState(start.err)
-  const linked = !!d.me?.routing, keep = useRef({ way, legs, busy }); keep.current = { way, legs, busy }
+  const [pickStart, setPickStart] = useState(false), linked = !!d.me?.routing, keep = useRef({ way, legs, busy, pickStart }); keep.current = { way, legs, busy, pickStart }
   const center: LngLat = way[0] ?? (w?.lat != null && w?.lon != null ? [w.lon, w.lat] : CORNAREDO)
   const track = legs.flatMap((l, i) => i ? l.c.slice(1) : l.c), total = legs.reduce((n, l) => n + l.m, 0) / 1000, gain = gainOf(track), fit = fitOf(total, start.session?.km)
   const full = !edit && (d.routes ?? []).length >= MAX_ROUTES
@@ -85,6 +85,7 @@ function Editor({ edit, query }: { edit?: Route; query: URLSearchParams }) {
   const guard = async (f: () => Promise<void>) => { if (keep.current.busy) return; setBusy(true); setErr(''); try { await f() } catch (e: any) { setErr(e.status ? e.message : 'Serve la connessione per calcolare il percorso.') } finally { setBusy(false) } }
   const add = (p: LngLat) => {
     if (!linked) return
+    if (keep.current.pickStart) { setFrom(p); setPickStart(false); setMode('mappa'); setWay([p]); setLegs([]); setIdeas(null); return }
     const { way: v } = keep.current
     void guard(async () => { if (!v.length) { setWay([p]); return } const l = await leg(v[v.length - 1], p); setLegs(x => [...x, l]); setWay(x => [...x, p]) })
   }
@@ -96,18 +97,31 @@ function Editor({ edit, query }: { edit?: Route; query: URLSearchParams }) {
     })
     setWay([...v]) // se il calcolo fallisce il punto torna al suo posto
   }
-  const [frame, setFrame] = useState(0), [want, setWant] = useState(() => String(start.session?.km || 8)), [ideas, setIdeas] = useState<Leg[] | null>(null), [pick, setPick] = useState(-1)
+  type Idea = Leg & { mix?: Mix | null; match: number }
+  const [frame, setFrame] = useState(0), [want, setWant] = useState(() => String(start.session?.km || 8)), [ideas, setIdeas] = useState<Idea[] | null>(null), [pick, setPick] = useState(-1)
+  const [from, setFrom] = useState<LngLat | null>(null), [grounds, setGrounds] = useState<Ground[]>([]), [locating, setLocating] = useState(false), [mode, setMode] = useState<'casa' | 'gps' | 'mappa'>('casa')
+  const home: LngLat = w?.lat != null && w?.lon != null ? [w.lon, w.lat] : CORNAREDO, origin = from ?? way[0] ?? home
+  const here = () => {
+    if (!navigator.geolocation) { setErr('Questo browser non dà la posizione.'); return }
+    setLocating(true)
+    navigator.geolocation.getCurrentPosition(p => { const q: LngLat = [Math.round(p.coords.longitude * 1e6) / 1e6, Math.round(p.coords.latitude * 1e6) / 1e6]; setFrom(q); setWay([q]); setLegs([]); setIdeas(null); setLocating(false); setMode('gps') }, () => { setErr('Posizione non disponibile: permetti la posizione o scegli il punto sulla mappa.'); setLocating(false) }, { enableHighAccuracy: true, timeout: 10000 })
+  }
   const propose = () => {
-    const k = parseFloat(want.replace(',', '.')), from = way[0] ?? center, base = Math.floor(Math.random() * 900)
+    const k = parseFloat(want.replace(',', '.')), base = Math.floor(Math.random() * 900)
     if (!(k >= 1 && k <= 45)) { setErr('Scegli una distanza tra 1 e 45 km.'); return }
     void guard(async () => {
-      const got = await Promise.allSettled([0, 1, 2].map(i => call<Leg>('POST', '/api/routing/loop', { start: from, km: k, seed: base + i * 31 })))
+      // sei proposte, metà col profilo a piedi e metà con quello da escursionismo, che preferisce i sentieri
+      const got = await Promise.allSettled([0, 1, 2, 3, 4, 5].map(i => call<Leg & { mix?: Mix | null }>('POST', '/api/routing/loop', { start: origin, km: k, seed: base + i * 31, hike: i % 2 === 1 })))
       const ok = got.flatMap(g => g.status === 'fulfilled' ? [g.value] : [])
       if (!ok.length) { const e = got.find(g => g.status === 'rejected') as PromiseRejectedResult; throw e.reason }
-      setIdeas(ok); use(ok[0], 0)
+      const best = rankLoops(ok, grounds, k)
+      setIdeas(best); use(best[0], 0)
     })
   }
   const use = (l: Leg, i: number) => { const s = splitLoop(l.c, 4, l.m); setWay(s.way); setLegs(s.legs); setPick(i); setFrame(f => f + 1) }
+  const shown = pickStart ? 'mappa' : mode === 'casa' && way.length && !ideas ? 'mappa' : mode
+  const toggle = (g: Ground) => setGrounds(l => l.includes(g) ? l.filter(x => x !== g) : [...l, g])
+  const pct = (x: number) => `${Math.round(x * 100)}%`
   const undo = () => { setErr(''); setWay(w => w.slice(0, -1)); setLegs(l => l.slice(0, -1)) }
   const ring = () => { if (way.length > 1) add(way[0]) }
   const back = () => { if (legs.length) { setLegs(l => [...l, ...mirror(l)]); setWay(v => [...v, ...[...v].reverse().slice(1)]) } }
@@ -133,16 +147,27 @@ function Editor({ edit, query }: { edit?: Route; query: URLSearchParams }) {
       {full && <p class="err pad">Puoi salvare al massimo {MAX_ROUTES} percorsi. Eliminane uno.</p>}
       {linked && (way.length < 2 || ideas) && <section class="panel rt-loop">
         <h2>Proponi un anello</h2>
-        <p class="sub">{ideas ? 'Tocca un anello per vederlo sulla mappa, o chiedine altri tre dallo stesso punto.' : way.length ? 'Parte dal punto che hai messo.' : 'Parte da casa, o tocca prima la mappa per scegliere la partenza.'}</p>
-        <div class="row"><Field label="Distanza in km"><input inputMode="decimal" value={want} onInput={e => setWant(e.currentTarget.value)} /></Field><button type="button" class="btn ghost" disabled={busy || !online.value} onClick={propose}>{ideas ? 'Altre tre' : 'Proponi tre anelli'}</button></div>
-        {ideas && <ul class="rt-ideas" role="list">{ideas.map((l, i) => <li key={i}><button type="button" class={i === pick ? 'sel' : ''} aria-pressed={i === pick} onClick={() => use(l, i)}><Thumb track={l.c} /><span><b>Anello {i + 1}</b><small>{km(l.m / 1000)} km{gainOf(l.c) != null ? ` · ${gainOf(l.c)} m` : ''}</small></span></button></li>)}</ul>}
+        <fieldset class="rt-f"><legend>Partenza</legend>
+          <div class="seg" role="group" aria-label="Partenza">
+            {([['casa', 'Casa'], ['gps', locating ? 'Cerco…' : 'Dove sono'], ['mappa', 'Sulla mappa']] as const).map(([k, l]) => { const on = shown === k; return <button type="button" key={k} class={on ? 'sel' : ''} aria-pressed={on} disabled={k === 'gps' && locating} onClick={() => { setPickStart(false); if (k === 'casa') { setMode('casa'); setFrom(null); setWay([]); setLegs([]); setIdeas(null) } else if (k === 'gps') here(); else { setPickStart(true); setIdeas(null) } }}>{l}</button> })}
+          </div>
+          <p class="sub">{pickStart ? 'Tocca la mappa nel punto da cui vuoi partire.' : from || way.length ? 'Parte dal punto segnato sulla mappa.' : w?.city ? `Parte da ${w.city}, la località del meteo.` : 'Parte dalla località del meteo.'}</p>
+        </fieldset>
+        <fieldset class="rt-f"><legend>Fondo che preferisci</legend>
+          <div class="chips">{GROUNDS.map(([g, l]) => <button type="button" key={g} class={grounds.includes(g) ? 'sel' : ''} aria-pressed={grounds.includes(g)} onClick={() => toggle(g)}>{l}</button>)}</div>
+          <p class="sub">{grounds.length ? 'Mostro i tre anelli che ci si avvicinano di più.' : 'Nessuna scelta: va bene qualsiasi fondo.'}</p>
+        </fieldset>
+        <div class="row"><Field label="Distanza in km"><input inputMode="decimal" value={want} onInput={e => setWant(e.currentTarget.value)} /></Field><button type="button" class="btn ghost" disabled={busy || !online.value || pickStart} onClick={propose}>{ideas ? 'Altre tre' : 'Proponi tre anelli'}</button></div>
+        {ideas && <ul class="rt-ideas" role="list">{ideas.map((l, i) => <li key={i}><button type="button" class={i === pick ? 'sel' : ''} aria-pressed={i === pick} onClick={() => use(l, i)}><Thumb track={l.c} /><span class="rt-i"><b>Anello {i + 1}{grounds.length && l.mix ? ` · ${pct(l.match)} come vuoi` : ''}</b><small>{km(l.m / 1000)} km{gainOf(l.c) != null ? ` · ${gainOf(l.c)} m` : ''}</small>
+          {l.mix ? <><span class="rt-mix" aria-hidden="true">{GROUNDS.map(([g]) => <i key={g} class={'g-' + g} style={{ width: pct(l.mix![g]) }} />)}<i class="g-ignoto" style={{ width: pct(l.mix.ignoto) }} /></span><small>{GROUNDS.map(([g, n]) => `${n.split(' ')[0]} ${pct(l.mix![g])}`).join(', ')}{l.mix.ignoto ? `, non indicato ${pct(l.mix.ignoto)}` : ''}</small></> : <small>Fondo non disponibile</small>}</span></button></li>)}</ul>}
+        {ideas && grounds.length > 0 && ideas[0].match < .5 && <Note>Nessuna proposta arriva alla metà del fondo che hai scelto: qui ce n'è poco, o la mappa non lo indica. Prova un'altra partenza o una distanza diversa.</Note>}
         {ideas && <p class="sub">Controlla il giro sulla mappa: la proposta può passare su strade poco adatte. Puoi spostare i punti.</p>}
       </section>}
       <div class="row"><button type="button" class="btn ghost" disabled={way.length < 2 || busy || !linked} onClick={ring}>Chiudi anello</button><button type="button" class="btn ghost" disabled={!legs.length || busy} onClick={back}>Andata e ritorno</button></div>
-      <div class="row"><button type="button" class="btn ghost" disabled={!way.length || busy} onClick={undo}>Annulla punto</button><button type="button" class="btn ghost" disabled={!way.length || busy} onClick={() => { setWay([]); setLegs([]); setErr(''); setIdeas(null) }}>Ricomincia</button></div>
+      <div class="row"><button type="button" class="btn ghost" disabled={!way.length || busy} onClick={undo}>Annulla punto</button><button type="button" class="btn ghost" disabled={!way.length || busy} onClick={() => { setWay([]); setLegs([]); setErr(''); setIdeas(null); setFrom(null) }}>Ricomincia</button></div>
       <button type="button" class="btn" disabled={!legs.length || busy || full} onClick={save}>{start.session ? 'Salva e collega alla seduta' : 'Salva'}</button>
     </section>
-    <div class="rt-canvas"><p class="rt-tip">Tocca la mappa per aggiungere un punto. Trascinalo per spostarlo.</p><LazyMap track={track} way={way} center={center} fit={frame} edit onTap={add} onMove={move} /></div>
+    <div class="rt-canvas"><p class="rt-tip">Tocca la mappa per aggiungere un punto. Trascinalo per spostarlo.</p><LazyMap track={track} way={way} center={from ?? center} fit={frame} edit onTap={add} onMove={move} /></div>
   </div>
 }
 export function Routes({ route }: { route: string }) {

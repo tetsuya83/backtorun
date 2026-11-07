@@ -3,7 +3,7 @@ import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 import planData from '../shared/plan.json'
 import { defaultState, MAX_WORKOUTS, planError, workoutError } from '../shared/engine'
 import { isStrava, remoteOf, watchEventError } from '../shared/intervals'
-import { MAX_ROUTES, routeError, type Pt } from '../shared/route'
+import { MAX_ROUTES, mixOf, routeError, type Pt } from '../shared/route'
 
 type Env = { Bindings: { DB: D1Database; SETUP_CODE?: string; INTERVALS_URL?: string; ORS_URL?: string }; Variables: { uid: number } }
 const app = new Hono<Env>()
@@ -319,8 +319,9 @@ app.post('/api/intervals/skip/:id', async c => {
   return c.json({ ok: true })
 })
 // openrouteservice: come per Intervals.icu, la chiave di ognuno resta sul server e non torna mai al telefono.
-const ors = (c: any, key: string, a: number[], b: number[] | null, loop?: { length: number; seed: number }) => fetch(`${c.env.ORS_URL ?? 'https://api.openrouteservice.org'}/v2/directions/foot-walking/geojson`, { method: 'POST', headers: { authorization: key, 'content-type': 'application/json', accept: 'application/geo+json' }, body: JSON.stringify(loop ? { coordinates: [a], elevation: true, options: { round_trip: { length: loop.length, points: 4, seed: loop.seed } } } : { coordinates: [a, b], elevation: true }) })
-async function orsLeg(c: any, key: string, a: number[], b: number[] | null, loop?: { length: number; seed: number }) {
+type Loop = { length: number; seed: number; hike?: boolean }
+const ors = (c: any, key: string, a: number[], b: number[] | null, loop?: Loop) => fetch(`${c.env.ORS_URL ?? 'https://api.openrouteservice.org'}/v2/directions/${loop?.hike ? 'foot-hiking' : 'foot-walking'}/geojson`, { method: 'POST', headers: { authorization: key, 'content-type': 'application/json', accept: 'application/geo+json' }, body: JSON.stringify(loop ? { coordinates: [a], elevation: true, extra_info: ['surface', 'waytype'], options: { round_trip: { length: loop.length, points: 4, seed: loop.seed } } } : { coordinates: [a, b], elevation: true }) })
+async function orsLeg(c: any, key: string, a: number[], b: number[] | null, loop?: Loop) {
   let r: Response
   try { r = await ors(c, key, a, b, loop) } catch { return { error: 'openrouteservice non risponde. Riprova più tardi.', status: 502 as const } }
   const j: any = await r.json().catch(() => null)
@@ -330,7 +331,8 @@ async function orsLeg(c: any, key: string, a: number[], b: number[] | null, loop
   const f = j?.features?.[0]
   if (!r.ok || !f?.geometry?.coordinates) return { error: 'openrouteservice non ha calcolato il tratto. Riprova.', status: 502 as const }
   const round = (x: number) => Math.round(x * 1e6) / 1e6
-  return { c: f.geometry.coordinates.map((p: number[]): Pt => p[2] != null ? [round(p[0]), round(p[1]), Math.round(p[2] * 10) / 10] : [round(p[0]), round(p[1])]), m: Number(f.properties?.summary?.distance ?? 0) }
+  const pts: Pt[] = f.geometry.coordinates.map((p: number[]): Pt => p[2] != null ? [round(p[0]), round(p[1]), Math.round(p[2] * 10) / 10] : [round(p[0]), round(p[1])]), x = f.properties?.extras
+  return { c: pts, m: Number(f.properties?.summary?.distance ?? 0), ...(loop ? { mix: mixOf(pts, x?.surface?.values, x?.waytype?.values) } : {}) }
 }
 const lonlat = (p: any) => Array.isArray(p) && p.length === 2 && p.every((x: any) => typeof x === 'number' && isFinite(x)) && Math.abs(p[0]) <= 180 && Math.abs(p[1]) <= 90
 app.put('/api/routing/key', async c => {
@@ -343,10 +345,10 @@ app.put('/api/routing/key', async c => {
 })
 app.delete('/api/routing/key', async c => { await c.env.DB.prepare('DELETE FROM routing WHERE user_id = ?').bind(c.get('uid')).run(); return c.json({ ok: true }) })
 app.post('/api/routing/loop', async c => {
-  const { start, km, seed } = await c.req.json<any>(), l = await c.env.DB.prepare('SELECT api_key key FROM routing WHERE user_id = ?').bind(c.get('uid')).first<{ key: string }>()
+  const { start, km, seed, hike } = await c.req.json<any>(), l = await c.env.DB.prepare('SELECT api_key key FROM routing WHERE user_id = ?').bind(c.get('uid')).first<{ key: string }>()
   if (!l) return c.json({ error: 'Collega openrouteservice in Profilo.' }, 400)
   if (!lonlat(start) || !(km >= 1 && km <= 45) || !Number.isInteger(seed) || seed < 0 || seed > 999) return c.json({ error: 'Scegli una distanza tra 1 e 45 km.' }, 400)
-  const r = await orsLeg(c, l.key, start, null, { length: Math.round(km * 1000), seed })
+  const r = await orsLeg(c, l.key, start, null, { length: Math.round(km * 1000), seed, hike: !!hike })
   return 'error' in r ? c.json({ error: r.error }, r.status) : c.json(r)
 })
 app.post('/api/routing/leg', async c => {
