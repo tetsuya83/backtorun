@@ -1,7 +1,8 @@
+import { easyPace, easyTrend, MIN_RUNS, paceRange, walkFrom } from '../../shared/paces'
 import { useState } from 'preact/hooks'
 import { data } from '../api'
 import { topKg } from '../../shared/training'
-import { hrMaxOf, loadAlert, samePace, weeklyLoads, zonesFrom } from '../../shared/analysis'
+import { loadAlert, samePace, weeklyLoads, zonesOf } from '../../shared/analysis'
 import { Field, Note } from '../ui'
 import { addDays, buildTimeline, isCustom, planFor, sessionKey, upper, type Slot } from '../../shared/engine'
 import { fmtDate, PAIN, todayISO } from '../guide'
@@ -43,6 +44,19 @@ function Loads() {
   return <section class="stack"><Field label="Carico per esercizio"><select value={id} onChange={e => setSel(e.currentTarget.value)}>{[...names].map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></Field>
     {pts.length > 1 ? <Line pts={pts} min={Math.max(0, lo - 5)} max={hi + 5} title={`${names.get(id)}, carico massimo`} unit=" kg" /> : <p class="sub pad">Serve una seconda seduta per vedere l'andamento.</p>}</section>
 }
+/** Il ritmo facile dalle corse continue delle ultime 4 settimane, con l'andamento settimanale. */
+export function EasyPaceCard() {
+  const d = data.value!, today = todayISO(), z = zonesOf(d), walk = walkFrom(buildTimeline(planFor(d), d.state))
+  const p = easyPace(d.activities, z, today, walk), tr = easyTrend(d.activities, z, today, 8, walk).filter(w => w.v != null)
+  if (!p) return <section class="panel"><h2>Il tuo ritmo facile</h2><p class="sub">Servono almeno {MIN_RUNS} corse continue facili nelle ultime 4 settimane, con il fiato segnato o il battito. Il cammino-corsa non conta, perché i tratti al passo falsano la media.</p></section>
+  const lo = Math.min(...tr.map(w => w.v!)), hi = Math.max(...tr.map(w => w.v!))
+  return <section class="panel pace-c">
+    <h2>Il tuo ritmo facile</h2>
+    <p class="big">{paceRange(p)} <small>al km</small></p>
+    {tr.length > 1 && <Line pts={tr.map(w => ({ label: fmtDate(w.monday, { day: 'numeric', month: 'short' }), v: w.v! }))} min={lo - 20} max={hi + 20} title="Ritmo facile, settimana per settimana" unit=" s/km" />}
+    <p class="sub">Da {p.n} corse continue delle ultime 4 settimane, con fiato da frasi complete o battito in Z2.{tr.length > 1 ? ' Più in basso nel grafico vuol dire più veloce.' : ''}</p>
+  </section>
+}
 export function Trends({ embedded }: { embedded?: boolean }) {
   const d = data.value!, plan = planFor(d), t = buildTimeline(plan, d.state), today = todayISO()
   const runs = d.activities.filter(a => a.type === 'corsa')
@@ -57,7 +71,7 @@ export function Trends({ embedded }: { embedded?: boolean }) {
   const last = runs.slice(-16), acts0 = d.activities.slice(-30), zones = zoneCounts(acts0.filter(a => a.pains), 1)
   const fat = last.filter(a => a.fatica != null).map(a => ({ label: fmtDate(a.date, { day: 'numeric', month: 'short' }), v: a.fatica!, t: a.sessionKey ? upper(ses.get(a.sessionKey)?.fatica) : null }))
   const knee = last.filter(a => a.knee != null).map(a => ({ label: fmtDate(a.date, { day: 'numeric', month: 'short' }), v: a.knee! }))
-  const hrm = hrMaxOf(d), z2 = hrm ? zonesFrom(hrm)[1] : null
+  const z2 = zonesOf(d)?.[1] ?? null
   const loads = weeklyLoads(d.activities, today, 8), alert = loadAlert(loads), shown = loads.slice(Math.max(0, loads.findIndex(w => w.load > 0))), noLoad = loads.reduce((s, w) => s + w.missing, 0)
   const cad = samePace(runs).slice(-16).map(a => ({ label: fmtDate(a.date, { day: 'numeric', month: 'short' }), v: a.cadence! }))
   // efficienza: secondi al km alla stessa FC di Z2, più basso è meglio
@@ -69,6 +83,7 @@ export function Trends({ embedded }: { embedded?: boolean }) {
         <div class="stats"><div><b>{Math.round(totKm)}</b><span>km corsi</span></div><div><b>{runs.length}</b><span>corse</span></div><div><b>{extra}</b><span>sedute extra</span></div></div>
       </section>
       <Bars rows={rows} title="Chilometri a settimana, fatti su previsti" unit="km" />
+      <EasyPaceCard />
       {alert && <Note><strong>Carico in salita.</strong> Questa settimana sei a {alert.load}, il {alert.pct}% sopra la media recente di {alert.avg}. Se non lo hai scelto tu, tieni facili le prossime sedute.</Note>}
       {loads.some(w => w.load > 0) && <><Bars rows={shown.map(w => ({ label: fmtDate(w.monday, { day: 'numeric', month: 'numeric' }), done: w.load, plan: null }))} title="Carico settimanale" unit="punti" /><p class="sub pad">Minuti per fatica di tutti gli allenamenti.{noLoad ? ` ${noLoad} senza durata o fatica non sono conteggiati.` : ''}</p></>}
       {fat.length > 1 && <Line pts={fat} max={10} title="Fatica reale e attesa" unit="/10" />}

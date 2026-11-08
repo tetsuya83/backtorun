@@ -3,7 +3,7 @@ import { data } from '../api'
 import { advance, blocksOf, effortInfo, finishStep, guideProgress, guideSteps, startGuide, stepLeft, timedAhead, type Block, type GStep, type GuideState, type Sport } from '../../shared/blocks'
 import { buildTimeline, plannedKey, planFor, sessionKey } from '../../shared/engine'
 import { addFix, newTrack } from '../../shared/gps'
-import { hrMaxOf, kmSplits, zoneHint, zonesFrom } from '../../shared/analysis'
+import { kmSplits, zoneHint, zonesOf } from '../../shared/analysis'
 import { cooldownFor, totalOf, warmupFor } from '../../shared/training'
 import { buzz, clearScheduled, keepAwake, local, say, schedule, unlockSound, type Cue } from '../sound'
 import { BlockList, goBack, nav, Note } from '../ui'
@@ -54,7 +54,7 @@ function Player({ steps, sig, title, mode, regUrl, sport, auto, cta = 'Registra 
   useImmersive()
   const useGpsNow = mode === 'gps'
   const gps = useGps(useGpsNow, (m, a) => { if (a != null) alt.current = a; if (last.current != null) pendingM.current += m })
-  const hr = useMemo(() => { const m = hrMaxOf(data.value!); return m ? zonesFrom(m) : null }, [])
+  const hr = useMemo(() => zonesOf(data.value!), [])
   const store = () => local.set(KEY, { sig, st: st.current, last: last.current, mode, trace: trace.current } satisfies Saved)
   const queue = () => { // suoni in anticipo solo fin dove il tempo è certo
     clearScheduled()

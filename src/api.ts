@@ -1,3 +1,4 @@
+import { withShoe } from '../shared/shoes'
 import { signal } from '@preact/signals'
 import { defaultState, normalizePlan, type Activity, type Plan, type Planned, type State, type Workout } from '../shared/engine'
 import type { Remote } from '../shared/intervals'
@@ -59,7 +60,7 @@ export async function load() {
   catch (e: any) { if (e.status === 401) throw e; if (!cached) throw e }
 }
 export function saveActivity(a: Activity) {
-  const d = data.value!; a = { ...a, updatedAt: Date.now() }
+  const d = data.value!; a = { ...withShoe(a, d.state), updatedAt: Date.now() }
   commit({ ...d, activities: [...d.activities.filter(x => x.id !== a.id), a].sort((x, y) => x.date.localeCompare(y.date)) })
   enqueue({ method: 'PUT', url: `/api/activities/${a.id}`, body: a })
 }

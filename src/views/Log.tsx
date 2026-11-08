@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { data, deleteActivity, imports, saveActivity, uid } from '../api'
 import { buildTimeline, isCustom, planFor, sessionDate, sessionKey, type Activity } from '../../shared/engine'
 import { fmtDate, PAIN as words, todayISO, WEEKDAY } from '../guide'
+import { shoeOf } from '../../shared/shoes'
 import { breathHint, Field, goBack, nav, Note, Scale } from '../ui'
 import { paceOf, parseActivityFile, timeOf, type FitResult } from '../fit'
 import { looksLikeRoute, openRouteGpx } from './Routes'
@@ -97,6 +98,7 @@ export function Log({ route }: { route: string }) {
   }
   const secsNow = toSec(dur), pace = paceOf(a.km, secsNow != null && Number.isFinite(secsNow) ? secsNow : null)
   const isRun = a.type === 'corsa'
+  const pairs = (d.state.shoes ?? []).filter(x => !x.retired || x.id === a.shoe)
   const quick = !!(q.get('guide') || q.get('intervals') || location.search.includes('shared=1') || (existing && (existing.km || existing.seconds)))
   const kmField = a.type !== 'forza' && <Field label="Distanza (km)"><input inputMode="decimal" value={a.km ?? ''} onInput={e => up({ km: num(e.currentTarget.value) })} /></Field>
   const durField = <fieldset class="hms"><legend>Durata</legend><div>
@@ -118,6 +120,7 @@ export function Log({ route }: { route: string }) {
       {isRun && <Scale label="Com'era il fiato?" max={5} value={a.fiato} onChange={v => up({ fiato: v })} hint={breathHint(a.fiato)} />}
       <Scale label={`Quanta fatica?${expected}`} max={10} value={a.fatica} onChange={v => up({ fatica: v })} />
       <PainPicker value={shown} onChange={setPains} required={must} />
+      {isRun && pairs.length > 0 && <div class="field"><span>Scarpe</span><div class="seg chips-row" role="group" aria-label="Scarpe">{[...pairs.map(x => [x.id, x.name] as const), [null, 'Nessuna'] as const].map(([id, l]) => <button type="button" key={id ?? '-'} class={shoeOf(a, d.state) === id ? 'sel' : ''} aria-pressed={shoeOf(a, d.state) === id} onClick={() => up({ shoe: id })}>{l}</button>)}</div></div>}
       {isRun && <label class="check"><input type="checkbox" checked={!!a.locked} onChange={e => up({ locked: e.currentTarget.checked })} /> {words.locked}</label>}
       <Field label="Note"><input value={a.note ?? ''} onInput={e => up({ note: e.currentTarget.value })} placeholder={isRun ? 'Sonno, freddo, intestino, sensazioni' : 'Esercizi, carichi, sensazioni'} /></Field>
       <details class="more">

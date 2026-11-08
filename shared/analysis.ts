@@ -13,6 +13,33 @@ export const validHr = (n?: number | null) => n != null && n >= 120 && n <= 230
 /** La FC massima scelta dalla persona; per Roberto vale quella della tabella finché non la cambia. */
 export const HRMAX_BASE = 186
 export const hrMaxOf = (d: { state: { hrMax?: number | null }; me?: { isAdmin: boolean } }) => d.state.hrMax ?? (d.me?.isAdmin ? HRMAX_BASE : null)
+/** Karvonen: le stesse percentuali applicate alla riserva cardiaca (massima meno riposo). */
+export function zonesReserve(hrMax: number, rest: number): Zone[] {
+  const r = hrMax - rest
+  let lo = Math.ceil(rest + r * .5)
+  return TOP.map((p, i) => { const hi = i === 4 ? hrMax : Math.floor(rest + r * p), z = { id: i + 1, name: `Z${i + 1}`, lo, hi }; lo = hi + 1; return z })
+}
+/** Zone scritte a mano: inizio della Z1 e fine di ogni zona, sei numeri in fila. */
+export const zonesManual = (b: number[]): Zone[] => [1, 2, 3, 4, 5].map(i => ({ id: i, name: `Z${i}`, lo: i === 1 ? b[0] : b[i - 1] + 1, hi: b[i] }))
+export const boundsOf = (z: Zone[]) => [z[0].lo, ...z.map(x => x.hi)]
+export const validBounds = (b?: number[] | null): b is number[] => !!b && b.length === 6 && b.every((x, i) => Number.isFinite(x) && x >= 40 && x <= 240 && (!i || x > b[i - 1]))
+export const validRest = (n?: number | null) => n != null && n >= 30 && n <= 100
+/** Cambia un confine e sposta i vicini quanto basta perché le zone restino in fila senza buchi. */
+export function setBound(b: number[], i: number, v: number) {
+  const n = [...b]; n[i] = Math.round(v)
+  for (let j = i + 1; j < n.length; j++) n[j] = Math.max(n[j], n[j - 1] + 1)
+  for (let j = i - 1; j >= 0; j--) n[j] = Math.min(n[j], n[j + 1] - 1)
+  return n
+}
+type HrData = { state: { hrMax?: number | null; hrZones?: { mode: 'max' | 'riserva' | 'mano'; rest?: number | null; bounds?: number[] | null } | null }; me?: { isAdmin: boolean } }
+/** Le zone in uso: a mano, con la riserva cardiaca o dalla sola FC massima. */
+export function zonesOf(d: HrData): Zone[] | null {
+  const z = d.state.hrZones, max = hrMaxOf(d)
+  if (z?.mode === 'mano' && validBounds(z.bounds)) return zonesManual(z.bounds)
+  if (!max) return null
+  if (z?.mode === 'riserva' && validRest(z.rest) && z.rest! < max - 40) return zonesReserve(max, z.rest!)
+  return zonesFrom(max)
+}
 export const observedMax = (acts: Activity[]) => { const v = acts.map(a => a.hrMax ?? 0).filter(x => validHr(x)); return v.length ? Math.max(...v) : null }
 export const zoneOf = (z: Zone[], hr: number) => hr < z[0].lo ? null : z.find(x => hr <= x.hi) ?? z[4]
 /** "Z2: 131-150 bpm" per le sedute che citano una zona. */

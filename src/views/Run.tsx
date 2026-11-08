@@ -1,6 +1,6 @@
 import { data } from '../api'
 import { buildTimeline, planFor, sessionKey } from '../../shared/engine'
-import { drift, hrMaxOf, kmSplits, timeInZones, zonesFrom } from '../../shared/analysis'
+import { drift, hrMaxOf, kmSplits, timeInZones, zonesOf } from '../../shared/analysis'
 import { fmtDate } from '../guide'
 import { paceOf, timeOf } from '../fit'
 import { Line } from './Trends'
@@ -11,7 +11,7 @@ export function RunView({ route }: { route: string }) {
   if (!a) return <div class="stack"><section class="head"><h1>Corsa non trovata</h1></section><a class="btn ghost" href="#/andamento">Torna ad Andamento</a></div>
   const plan = planFor(d), t = buildTimeline(plan, d.state)
   const ses = a.sessionKey ? t.slots.flatMap(s => s.sessions.map(x => [sessionKey(s, x.day), x] as const)).find(([k]) => k === a.sessionKey)?.[1] : undefined
-  const tr = a.trace ?? [], max = hrMaxOf(d), zones = max ? zonesFrom(max) : null
+  const tr = a.trace ?? [], max = hrMaxOf(d), zones = zonesOf(d)
   const inZ = zones && tr.length ? timeInZones(tr, zones) : null, zTot = inZ?.reduce((x, y) => x + y, 0) ?? 0
   const dr = drift(tr, ses?.text), km = kmSplits(tr)
   const fastest = Math.min(...km.filter(k => !k.partial).map(k => k.seconds))

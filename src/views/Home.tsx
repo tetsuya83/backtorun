@@ -15,6 +15,9 @@ import { learnFor } from '../learn'
 import { sessionMin } from '../../shared/tips'
 import { cooldownFor, routineById, totalOf, warmupFor, type Routine } from '../../shared/training'
 import { paceOf, timeOf } from '../fit'
+import { shoeUse } from '../../shared/shoes'
+import { easyPace, paceRange, walkFrom } from '../../shared/paces'
+import { zonesOf } from '../../shared/analysis'
 import { StopCard } from './Stop'
 import { local, unlockSound } from '../sound'
 import { useEffect } from 'preact/hooks'
@@ -101,12 +104,14 @@ function TodayCard() {
   </section>
   const run = ses.km !== 0, blocks = run ? blocksOf(ses) : null, tone = sessionTone(ses), art = learnFor(ses.text), warm = warmupFor(ses.text), cool = cooldownFor(ses.text, ses.km)
   const route = d.routes?.find(x => x.session?.key === key)
+  const pace = run && tone?.key === 'easy' && !/cammin/i.test(ses.text) ? easyPace(d.activities, zonesOf(d), today, walkFrom(t)) : null
   const facts = [run ? `${sessionMin(ses)} min` : null, ses.fiato ? `fiato: ${ses.fiato.toLowerCase()}` : null, ses.fatica ? `fatica ${ses.fatica}${/^\d/.test(ses.fatica) ? ' su 10' : ''}` : null].filter(Boolean).join(' · ')
   return <section class="panel today-c">
     <div class="pill-row"><p class="eyebrow">{label}</p>{tone && <span class={'pill ' + tone.key}>{tone.label}</span>}</div>
     <h2>{ses.text}</h2>
     {blocks && <BlockList blocks={blocks} compact />}
     {facts && <p class="facts-l">{facts}</p>}
+    {pace && <p class="sub">Il tuo ritmo facile: circa {paceRange(pace)} al km. Se il fiato sale, rallenta: conta il fiato, non il numero.</p>}
     {done ? <>
       <div class="done"><strong>Registrato</strong><span>{[done.km ? done.km + ' km' : null, timeOf(done.seconds), paceOf(done.km, done.seconds), done.fatica ? `fatica ${done.fatica}` : null].filter(Boolean).join(', ') || 'Bel lavoro'}</span><a href={`#/registra?id=${done.id}`}>Modifica</a></div>
       <div class="quick">
@@ -212,6 +217,18 @@ function NextRun() {
   if (!next) return null
   return <a class="card-l" href="#/piano"><span><small>Prossima corsa · {fmtDate(next.date, { weekday: 'long', day: 'numeric' })}</small><b>{next.x.text}</b></span><Ic d={ICON.chev} size={16} /></a>
 }
+/** Un paio di scarpe vicino al limite: un avviso solo, finché non lo chiudi. */
+function ShoeAlert() {
+  const d = data.value!, seen = d.state.adaptSeen ?? []
+  const u = shoeUse(d.state, d.activities).find(x => !x.shoe.retired && x.level !== 'ok' && !seen.includes(`shoe-${x.shoe.id}-${x.level}`))
+  if (!u) return null
+  return <section class="panel warn" aria-label="Scarpe">
+    <p class="eyebrow">Scarpe</p>
+    <h2>{u.shoe.name}: {u.km} km su {u.shoe.limitKm}</h2>
+    <p>{u.level === 'cambia' ? 'Hai superato il limite che hai scelto.' : 'Ti stai avvicinando al limite.'} Guarda la suola e come senti le gambe: i km sono solo un'indicazione.</p>
+    <div class="row"><a class="btn ghost" href="#/impostazioni/scarpe">Le tue scarpe</a><button type="button" class="btn ghost" onClick={() => saveState({ ...d.state, adaptSeen: [...seen, `shoe-${u.shoe.id}-${u.level}`].slice(-60) })}>Ho capito</button></div>
+  </section>
+}
 export function Home() {
   useEffect(() => { void syncWatch() }, [data.value?.state, data.value?.me?.intervals])
   const d = data.value!, today = todayISO(), [mn, , tip] = MONTHS[+today.slice(5, 7) - 1]
@@ -226,6 +243,7 @@ export function Home() {
     <Reminder />
     <StopCard />
     <Review />
+    <ShoeAlert />
     <WeekSummary />
     <TestReminder />
     <PlannedToday />
