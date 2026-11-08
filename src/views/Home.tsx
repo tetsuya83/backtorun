@@ -3,7 +3,9 @@ import { nextAdvice, weekAdvice, weekSummary, type Advice } from '../../shared/a
 import { addDays, buildTimeline, isCustom, planFor, reviewWeek, sessionDate, sessionKey, slotForDate, DAYS, strengthDays, type Plan, type Slot } from '../../shared/engine'
 import { blocksOf, sessionTone } from '../../shared/blocks'
 import { painsOf, painText } from '../../shared/pain'
-import { fmtDate, MONTHS, PAIN as words, STRENGTH, STRENGTH_LIST, todayISO } from '../guide'
+import { fmtDate, MONTHS, PAIN as words, todayISO } from '../guide'
+import { itemsOf, listOf, minutesOf, sheetFor } from '../../shared/strength'
+import { jointOk } from '../../shared/training'
 import { BlockList, nav, Note } from '../ui'
 import { PlannedToday } from './Workouts'
 import { ImportCard } from './Import'
@@ -13,7 +15,8 @@ import { learnFor } from '../learn'
 import { sessionMin } from '../../shared/tips'
 import { cooldownFor, routineById, totalOf, warmupFor, type Routine } from '../../shared/training'
 import { paceOf, timeOf } from '../fit'
-import { unlockSound } from '../sound'
+import { StopCard } from './Stop'
+import { local, unlockSound } from '../sound'
 import { useEffect } from 'preact/hooks'
 import { syncWatch } from '../watchSync'
 import { WhatsNew } from './WhatsNew'
@@ -86,11 +89,13 @@ function TodayCard() {
   </section>
   if (!slot) return <section class="panel today-c"><p class="eyebrow">Piano concluso</p><h2>Bel lavoro</h2><a class="btn" href="#/mio-piano">Scegli il prossimo obiettivo</a></section>
   const label = `Oggi · ${weekLabel(slot)} · ${phaseName(plan, slot.phase)}${slot.scarico ? ', scarico' : ''}`
+  const sh = force ? sheetFor(plan, t, slot, today) : null, sheet = sh?.sheet
+  const place = local.get<'palestra' | 'casa'>('btr-forza-luogo') ?? 'palestra'
   if (!ses) return <section class="panel today-c">
     <p class="eyebrow">{label}</p>
-    <h2>{force ? 'Oggi forza' : 'Oggi niente corsa'}</h2>
-    <p>{force ? `${STRENGTH[String(slot.phase)] ?? STRENGTH['1']}. ${STRENGTH_LIST}` : wd === 5 ? 'Nuoto o bici facili, se ti va.' : 'Recupera: il corpo migliora anche a riposo.'}</p>
-    {force ? gym ? <div class="done"><strong>Registrato</strong><span>{gym.sets?.length ? `${gym.sets.length} esercizi` : 'Forza'}{gym.fatica ? `, fatica ${gym.fatica}` : ''}</span><a href={`#/registra?id=${gym.id}`}>Modifica</a></div>
+    <h2>{sheet ? `Oggi forza: ${sheet.letter === 'R' ? 'scheda' : 'scheda ' + sheet.letter}` : force ? 'Oggi niente forza' : 'Oggi niente corsa'}</h2>
+    <p>{sheet ? <><b>{sheet.name}</b>, circa {minutesOf(itemsOf(sheet, place, slot.phase, slot.scarico, jointOk(d.activities)))} minuti {place === 'casa' ? 'a corpo libero' : 'in palestra'}. {listOf(sheet, place)}.</> : sh?.why ?? (wd === 5 ? 'Nuoto o bici facili, se ti va.' : 'Recupera: il corpo migliora anche a riposo.')}</p>
+    {sheet ? gym ? <div class="done"><strong>Registrato</strong><span>{gym.sets?.length ? `${gym.sets.length} esercizi` : 'Forza'}{gym.fatica ? `, fatica ${gym.fatica}` : ''}</span><a href={`#/registra?id=${gym.id}`}>Modifica</a></div>
       : <><button type="button" class="btn" onClick={() => nav(`forza?date=${today}`)}>Inizia la forza</button><a class="ses-l" href={`#/registra?type=forza&date=${today}`}>Registra senza scheda</a></>
       : <a class="btn ghost" href="#/routine?id=mobility">Mobilità, {mins(routineById('mobility')!)} min</a>}
   </section>
@@ -219,6 +224,7 @@ export function Home() {
     <WeekStrip />
     <TodayCard />
     <Reminder />
+    <StopCard />
     <Review />
     <WeekSummary />
     <TestReminder />
@@ -232,7 +238,7 @@ export function Home() {
       <ul class="cards">
         <li><a href="#/allenamenti"><span><b>I miei allenamenti</b><small>Corsa e nuoto salvati, da avviare o mettere nel piano</small></span></a></li>
         <li><a href="#/costruisci"><span><b>Costruisci un allenamento</b><small>Scegli un modello, adatta i blocchi e parti</small></span></a></li>
-        <li><a href={`#/forza?date=${today}`}><span><b>Forza</b><small>Scheda guidata, in palestra o a casa</small></span></a></li>
+        <li><a href={`#/forza?date=${today}`}><span><b>Forza</b><small>Schede A e B per fase, in palestra o a corpo libero</small></span></a></li>
         <li><a href="#/routine"><span><b>Routine e timer libero</b><small>Riscaldamento, mobilità, defaticamento</small></span></a></li>
         <li><a href="#/percorsi"><span><b>Percorsi</b><small>Disegnali sulla mappa e mandali all'orologio</small></span></a></li>
       </ul>

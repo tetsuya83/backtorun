@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { data, saveState } from '../api'
-import { addDays, buildTimeline, isCustom, planFor, sessionDate, sessionKey, slotForDate, strengthDays, type Slot } from '../../shared/engine'
-import { dayList, fmtDate, STRENGTH, todayISO, WEEKDAY } from '../guide'
+import { addDays, buildTimeline, DAYS, isCustom, planFor, sessionDate, sessionKey, slotForDate, strengthDays, type Day, type Plan, type Slot, type Timeline } from '../../shared/engine'
+import { sheetFor, stageOf, STAGE_NAME } from '../../shared/strength'
+import { fmtDate, STRENGTH, todayISO, WEEKDAY } from '../guide'
 import { phaseName, weekLabel } from './Home'
 import { BlockList, Gauge } from '../ui'
 import { blocksOf } from '../../shared/blocks'
@@ -9,7 +10,15 @@ import { learnFor } from '../learn'
 import { PlannedRow, SaveSession } from './Workouts'
 import { testInfo } from '../../shared/tests'
 
-function WeekRow({ s, open, toggle, current }: { s: Slot; open: boolean; toggle: () => void; current: boolean }) {
+function StrengthLine({ plan, t, s, force }: { plan: Plan; t: Timeline; s: Slot; force: Day[] }) {
+  const days = [...force].sort((a, b) => DAYS.indexOf(a) - DAYS.indexOf(b))
+  const parts = days.map(day => { const x = sheetFor(plan, t, s, sessionDate(s, day)); return x.sheet ? `${WEEKDAY[day].toLowerCase()} ${x.sheet.letter === 'R' ? 'scheda' : 'scheda ' + x.sheet.letter} (${x.sheet.name.toLowerCase()})` : null }).filter(Boolean)
+  const stage = stageOf(t, s)
+  if (!parts.length) return <p class="strength">Forza: niente in questa settimana, solo mobilità.</p>
+  return <p class="strength">Forza · {STAGE_NAME[stage]}: {parts.join(', ')}. {STRENGTH[stage === 'rifinitura' ? '4' : String(s.phase)] ?? STRENGTH['1']}{s.scarico ? ', con una serie in meno' : ''}.</p>
+}
+
+function WeekRow({ s, t, open, toggle, current }: { s: Slot; t: Timeline; open: boolean; toggle: () => void; current: boolean }) {
   const d = data.value!, plan = planFor(d), custom = isCustom(plan), force = strengthDays(plan)
   const n = typeof s.week === 'number' ? s.week : 0
   const ses = s.sessions.filter(x => x.km !== 0)
@@ -27,7 +36,7 @@ function WeekRow({ s, open, toggle, current }: { s: Slot; open: boolean; toggle:
         {ses.length > 0 && (past && doneN >= ses.length ? <span class="wk-dots ok">Fatta</span> : past || current ? <span class={'wk-dots' + (past ? ' miss' : '')}>{doneN} di {ses.length}</span> : <span class="wk-dots" />)}
       </button>
       {open && <div class="wk-body">
-        {force.length > 0 && <p class="strength">Forza {dayList(force)}: {STRENGTH[String(s.phase)] ?? STRENGTH['1']}</p>}
+        {force.length > 0 && <StrengthLine plan={plan} t={t} s={s} force={force} />}
         {!s.sessions.length && <p class="sub">Settimana da compilare. <a href="#/mio-piano/modifica">Modifica il piano</a></p>}
         {same && <p class="sub">Tutte così: {[same.fiato?.toLowerCase(), same.fatica ? `fatica ${same.fatica}` : null].filter(Boolean).join(', ')}</p>}
         {s.sessions.map(x => {
@@ -71,6 +80,7 @@ export function PlanView() {
         <div class="goal-h"><h2>{custom ? plan.meta.name : 'Maratona graduale'}</h2>{idx >= 0 && <span>sett. {idx + 1} di {shown.length}</span>}</div>
         <div class="bar" aria-hidden="true"><i style={{ width: `${Math.max(2, (idx + 1) / shown.length * 100)}%` }} /></div>
         <a class="card-l in" href="#/gara"><span><b>{d.state.raceDate ? `Gara il ${fmtDate(d.state.raceDate, { day: 'numeric', month: 'long', year: 'numeric' })}${d.state.raceName ? `, ${d.state.raceName}` : ''}` : 'Gara: scegli la data'}</b><small>{d.state.raceDate ? 'Gara e calendario' : custom ? `Fine del piano il ${fmtDate(t.earliestRace, { day: 'numeric', month: 'long', year: 'numeric' })}` : `Maratona possibile dal ${fmtDate(t.earliestRace, { day: 'numeric', month: 'long', year: 'numeric' })}`}</small></span><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg></a>
+        <a class="card-l in" href="#/stop"><span><b>Ti sei fermato?</b><small>{(d.state.resumes ?? []).length ? `Ultimo stop: dal ${fmtDate(d.state.resumes!.at(-1)!.from, { day: 'numeric', month: 'short' })} al ${fmtDate(d.state.resumes!.at(-1)!.to, { day: 'numeric', month: 'short' })}` : 'Segna uno stop e scopri da dove ripartire'}</small></span></a>
         <a class="card-l in" href="#/test"><span><b>Test e condizione</b><small>{lastTest ? `Ultimo: ${testInfo(lastTest.kind)?.name ?? lastTest.kind}, ${fmtDate(lastTest.date, { day: 'numeric', month: 'short' })}` : 'Scala, Cooper, 5 km e cammino'}</small></span><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg></a>
         {(skipped > 0 || reps > 0) && <p class="sub">{skipped} {skipped === 1 ? 'settimana saltata' : 'settimane saltate'}, {reps} {reps === 1 ? 'ripetuta' : 'ripetute'}. <button class="link" onClick={() => saveState({ ...d.state, skips: [], repeats: [] })}>Annulla tutto</button></p>}
       </section>
@@ -78,7 +88,7 @@ export function PlanView() {
       {t.raceTooClose && <div class="note stop"><strong>{custom ? 'Il piano finisce dopo la gara.' : 'Gara troppo vicina.'}</strong> {custom ? 'Annulla una ripetizione, oppure togli una settimana dal piano.' : 'Il blocco maratona dura 16 settimane: la data più vicina è '}{!custom && fmtDate(t.earliestRace, { day: 'numeric', month: 'long', year: 'numeric' })}{!custom && '.'}</div>}
       {groups.map((g, i) => <section key={g.name + g.slots[0].key} id={'fase-' + i} class="fase">
         <h2 class="phase">{g.name}</h2>
-        <ul class="weeks">{g.slots.map(s => <WeekRow key={s.key} s={s} current={s === cur} open={open === s.key} toggle={() => setOpen(open === s.key ? null : s.key)} />)}</ul>
+        <ul class="weeks">{g.slots.map(s => <WeekRow key={s.key} s={s} t={t} current={s === cur} open={open === s.key} toggle={() => setOpen(open === s.key ? null : s.key)} />)}</ul>
       </section>)}
       {!d.state.raceDate && !custom && <p class="sub pad">Il blocco maratona di 16 settimane si aggiunge quando scegli una gara.</p>}
     </div>

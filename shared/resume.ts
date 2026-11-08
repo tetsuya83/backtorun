@@ -40,3 +40,10 @@ export function trialPain(st: State, acts: Activity[], kneeZone = 'ginocchio') {
   const a = acts.filter(x => x.type === 'corsa' && r.trials!.includes(x.date)).map(x => ({ x, p: [...painsOf(x, kneeZone)].sort((a, b) => b.level - a.level)[0] })).find(v => v.p && v.p.level > 2)
   return a ? { level: a.p!.level, date: a.x.date, id: `trial-${a.x.id}` } : null
 }
+/** Toglie l'ultima ripresa e le sue uscite di prova ancora nel piano. */
+export function undoResume(st: State): State {
+  const r = (st.resumes ?? []).at(-1)
+  if (!r) return st
+  const trials = r.trials ?? []
+  return { ...st, resumes: (st.resumes ?? []).slice(0, -1), planned: (st.planned ?? []).filter(x => !(x.name === 'Uscita di prova' && trials.includes(x.date))) }
+}

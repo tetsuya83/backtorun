@@ -3,7 +3,7 @@ import type { Activity } from './engine'
 /* ---------- Forza ---------- */
 export type Place = 'palestra' | 'casa'
 export type Kind = 'load' | 'body' | 'time'
-export interface Exercise { id: string; name: string; cue: string; kind: Kind; main?: boolean; perSide?: boolean; step?: number; alt?: Omit<Exercise, 'alt'> }
+export interface Exercise { id: string; name: string; cue: string; kind: Kind; main?: boolean; perSide?: boolean; step?: number; plyo?: boolean; alt?: Omit<Exercise, 'alt'> }
 export interface Scheme { sets: number; min: number; max: number; rest: number; unit: 'rip' | 'sec' }
 export interface SetLog { kg?: number | null; reps: number }
 export interface ExerciseLog { id: string; name: string; kind: Kind; min: number; max: number; sets: SetLog[] }
@@ -38,6 +38,7 @@ const RANGE: Record<string, [number, number, number, number]> = { // serie princ
 export function schemeFor(ex: Exercise, phase: number, scarico: boolean, place: Place): Scheme {
   const [main, other, lo, hi] = RANGE[String(phase)] ?? RANGE['1']
   const cut = (n: number) => Math.max(2, n - (scarico ? 1 : 0))
+  if (ex.plyo) return { sets: cut(3), min: 10, max: 15, rest: 60, unit: 'rip' }
   if (ex.kind === 'time') return { sets: cut(3), min: phase < 2 ? 20 : 30, max: phase < 2 ? 40 : 60, rest: 45, unit: 'sec' }
   const home = place === 'casa' // a corpo libero il carico è basso: la difficoltà viene da più ripetizioni
   return { sets: cut(ex.main ? main : other), min: home ? 8 : lo, max: home ? 12 : hi, rest: ex.main && !home ? (lo < 8 ? 120 : 90) : 75, unit: 'rip' }
@@ -63,6 +64,7 @@ export function suggest(last: ExerciseLog | null, ex: Exercise, s: Scheme, ok: b
   const top = last.sets.length >= s.sets && last.sets.every(x => x.reps >= s.max)
   if (!top) return { kg, up: false, text: last.sets.some(x => x.reps < s.min) ? 'Resta su questo carico finché tutte le serie sono nello schema.' : `Stesso carico: cerca ${s.max} ${unit} in tutte le serie.` }
   if (!ok) return { kg, up: false, text: 'Serie complete, ma tieni questo livello finché dolore e gonfiore non passano.' }
+  if (ex.plyo) return { kg: null, up: true, text: 'Serie complete: stessi salti, ma più rapidi e silenziosi.' }
   if (ex.kind === 'time') return { kg: null, up: true, text: 'Serie complete: aggiungi 5 secondi.' }
   if (ex.kind === 'body' && !kg) return { kg: null, up: true, text: 'Serie complete: rallenta la discesa o aggiungi uno zaino leggero.' }
   const inc = ex.step ?? 2.5

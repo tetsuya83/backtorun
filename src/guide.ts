@@ -20,7 +20,6 @@ export const STRENGTH: Record<string, string> = {
   '3.5': '3×6-8, senza cedimento',
   '4': '2-3×6-8, senza cedimento',
 }
-export const STRENGTH_LIST = 'Leg press o squat, stacco rumeno, affondi o split squat, hip thrust, polpacci in piedi e seduto, discese da gradino a una gamba, plank e side plank.'
 export const BREATH = ['Respiro tranquillo, potresti cantare', 'Parli in frasi complete', 'Parli a frasi brevi', 'Fiatone, solo poche parole', 'Non riesci a parlare']
 export const breathLevel = (s?: string | null) => {
   if (!s) return null

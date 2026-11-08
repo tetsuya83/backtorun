@@ -8,6 +8,7 @@ import { PlanView } from './views/Plan'
 import { Log } from './views/Log'
 import { Tests } from './views/Tests'
 import { Settings, SettingsPage } from './views/Settings'
+import { StopView } from './views/Stop'
 import { Strength } from './views/Strength'
 import { RunView } from './views/Run'
 import { RoutineView, TimerView } from './views/Timer'
@@ -29,7 +30,7 @@ import { mustChoose } from '../shared/engine'
 
 const TABS = [
   ['home', 'Oggi', 'M4 13h6l2-7 4 13 2-6h2', ['home', 'oggi', 'guida', 'registra', 'forza', 'timer', 'routine', 'costruisci', 'allenamenti', 'percorsi']],
-  ['piano', 'Piano', 'M5 5h14v15H5zM5 10h14M9 3v4M15 3v4', ['piano', 'mio-piano', 'test', 'gara']],
+  ['piano', 'Piano', 'M5 5h14v15H5zM5 10h14M9 3v4M15 3v4', ['piano', 'mio-piano', 'test', 'gara', 'stop']],
   ['diario', 'Diario', 'M5 19v-6M12 19V6M19 19v-9', ['diario', 'andamento', 'corsa', 'consulta']],
   ['impara', 'Impara', 'M4 5h7a2 2 0 0 1 2 2v13a2 2 0 0 0-2-2H4zM20 5h-5a2 2 0 0 0-2 2v13a2 2 0 0 1 2-2h5z', ['impara']],
   ['impostazioni', 'Profilo', 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0', ['impostazioni', 'aiuto', 'novita']],
@@ -108,6 +109,7 @@ function App() {
         {base === 'test' && <Tests key={route} route={route} />}
         {base === 'corsa' && <RunView route={route} />}
         {base === 'forza' && <Strength key={route} route={route} />}
+        {base === 'stop' && <StopView key={route} route={route} />}
         {base === 'timer' && <TimerView key={route} route={route} />}
         {base === 'routine' && <RoutineView key={route} route={route} />}
         {base === 'mio-piano' && <MyPlan />}

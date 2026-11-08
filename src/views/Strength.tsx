@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'preact/hooks'
 import { data, saveActivity, uid } from '../api'
 import { buildTimeline, planFor, slotForDate } from '../../shared/engine'
-import { jointOk, lastLog, schemeFor, suggest, WORKOUTS, type Exercise, type ExerciseLog, type Place, type Scheme } from '../../shared/training'
+import { jointOk, lastLog, suggest, type Exercise, type ExerciseLog, type Place, type Scheme } from '../../shared/training'
+import { itemsOf, listOf, minutesOf, sheetById, sheetFor, STAGE_NAME } from '../../shared/strength'
 import { fmtDate, PAIN as words, todayISO } from '../guide'
 import { buzz, clearScheduled, keepAwake, local, say, schedule, unlockSound } from '../sound'
 import { Field, nav, Note, Scale } from '../ui'
@@ -12,7 +13,7 @@ import { PainPicker } from './Pain'
 
 const KEY = 'btr-forza', PLACE = 'btr-forza-luogo'
 type Row = { kg: string; reps: string; done: boolean }
-interface Draft { date: string; start: number; place: Place; alt: Record<string, boolean>; rows: Record<string, Row[]> }
+interface Draft { date: string; start: number; place: Place; alt: Record<string, boolean>; rows: Record<string, Row[]>; sheet?: string }
 const fresh = (date: string, place: Place): Draft => ({ date, start: Date.now(), place, alt: {}, rows: {} })
 const num = (s: string) => { const n = +s.replace(',', '.'); return s.trim() && isFinite(n) ? n : null }
 
@@ -51,7 +52,9 @@ function Card({ ex, s, d, set, onDone, ok }: { ex: Exercise; s: Scheme; d: Draft
 export function Strength({ route }: { route: string }) {
   const app = data.value!, plan = planFor(app)
   const date = new URLSearchParams(route.split('?')[1] ?? '').get('date') ?? todayISO()
-  const slot = useMemo(() => slotForDate(buildTimeline(plan, app.state), date), [plan, app.state, date])
+  const t = useMemo(() => buildTimeline(plan, app.state), [plan, app.state]), slot = useMemo(() => slotForDate(t, date), [t, date])
+  const lastSheet = [...app.activities].reverse().find(a => a.type === 'forza' && a.sheet && a.date < date)?.sheet
+  const today = sheetFor(plan, t, slot, date, lastSheet)
   const [d, setD] = useState<Draft>(() => local.get<Draft>(KEY) ?? fresh(date, local.get<Place>(PLACE) ?? 'palestra'))
   const [end, setEnd] = useState(0), [, tick] = useState(0), [fatica, setFatica] = useState<number | null>(null), [pains, setPains] = useState<Pain[]>(() => watchedZones(app).map(zone => ({ zone, level: 0 })))
   const [note, setNote] = useState(''), [err, setErr] = useState('')
@@ -68,9 +71,10 @@ export function Strength({ route }: { route: string }) {
   const rest = (s: number) => { if (!logs(d).length) set(x => ({ ...x, start: Date.now() })); unlockSound(); clearScheduled(); schedule([{ at: s, cue: 'work' }]); setEnd(Date.now() + s * 1000) }
   const addRest = () => { const left = end + 30000 - Date.now(); clearScheduled(); schedule([{ at: left / 1000, cue: 'work' }]); setEnd(e => e + 30000) }
   const stale = d.date !== date && Object.values(d.rows).some(r => r.some(x => x.done))
-  const list = WORKOUTS[d.place], ok = jointOk(app.activities)
-  const phase = slot?.phase ?? 1, down = !!slot?.scarico
-  const items = list.map(ex => ({ ex, s: schemeFor(ex, phase, down, d.place) }))
+  const ok = jointOk(app.activities), phase = slot?.phase ?? 1, down = !!slot?.scarico
+  const sheet = sheetById(d.sheet) ?? today.sheet ?? today.other ?? sheetById(today.stage === 'gara' ? 'rifinitura' : 'base-a')!
+  const items = itemsOf(sheet, d.place, phase, down, ok), jumps = !ok && sheet.items[d.place].some(e => e.plyo)
+  const swap = sheet.id === today.sheet?.id ? today.other : today.sheet
   const logs = (x: Draft): ExerciseLog[] => items.flatMap(({ ex, s }) => {
     const a = x.alt[ex.id] && ex.alt ? { ...ex, ...ex.alt } as Exercise : ex
     const sets = (x.rows[a.id] ?? []).filter(r => r.done).map(r => ({ kg: num(r.kg), reps: num(r.reps) ?? s.max }))
@@ -80,7 +84,7 @@ export function Strength({ route }: { route: string }) {
     const sets = logs(d)
     if (!sets.length) { setErr('Spunta almeno una serie.'); return }
     if (fatica == null) { setErr('Indica la fatica.'); return }
-    saveActivity(withPains({ id: uid(), date, type: 'forza' as const, source: 'manuale' as const, seconds: Math.min(4 * 3600, Math.round((Date.now() - d.start) / 1000)), fatica, note: note.trim() || null, sets }, pains))
+    saveActivity(withPains({ id: uid(), date, type: 'forza' as const, source: 'manuale' as const, seconds: Math.min(4 * 3600, Math.round((Date.now() - d.start) / 1000)), fatica, note: note.trim() || null, sets, sheet: sheet.id }, pains))
     local.del(KEY); nav('home')
   }
   const last = [...app.activities].reverse().find(a => a.type === 'corsa')
@@ -90,10 +94,15 @@ export function Strength({ route }: { route: string }) {
   const left = end ? Math.max(0, Math.ceil((end - Date.now()) / 1000)) : 0
   return (
     <div class="stack form strength-v">
-      <section class="head"><h1>Forza</h1><p>{slot ? (down ? 'Settimana di scarico: una serie in meno.' : 'Lascia sempre due ripetizioni in riserva.') : 'Lascia sempre due ripetizioni in riserva.'}</p>
-        <a href="#/routine?id=warm-gym">Riscaldamento di 5 minuti</a></section>
+      <section class="head"><p class="eyebrow">Forza · {STAGE_NAME[sheet.stage]}{down ? ', scarico' : ''}</p><h1>{sheet.letter === 'R' ? 'Scheda' : `Scheda ${sheet.letter}`} · {sheet.name}</h1>
+        <p>{sheet.focus}. Circa {minutesOf(items)} minuti. {down ? 'Settimana di scarico: una serie in meno.' : 'Lascia sempre due ripetizioni in riserva.'}</p>
+        {!today.sheet && today.why && <p class="sub">{today.why} Se vuoi muoverti comunque, ecco la scheda leggera.</p>}
+        <a href="#/routine?id=warm-gym">Riscaldamento di 5 minuti</a>
+        {swap && !logs(d).length && <button type="button" class="link" onClick={() => set(x => ({ ...x, sheet: swap.id }))}>Oggi preferisci la scheda {swap.letter} ({swap.name.toLowerCase()})?</button>}</section>
       {last?.locked ? <Note tone="stop"><strong>{words.stop}</strong> {words.stopText} Oggi niente esercizi per le gambe.</Note> : !ok && <Note tone="stop"><strong>{words.warn}</strong> Niente aumenti di carico: togli ciò che dà dolore.</Note>}
-      <div class="seg" role="group" aria-label="Dove ti alleni">{(['palestra', 'casa'] as Place[]).map(p => <button type="button" key={p} class={d.place === p ? 'sel' : ''} aria-pressed={d.place === p} disabled={logs(d).length > 0 && d.place !== p} onClick={() => { local.set(PLACE, p); set(x => ({ ...x, place: p })) }}>{p === 'palestra' ? 'Palestra' : 'Casa'}</button>)}</div>
+      <div class="seg" role="group" aria-label="Dove ti alleni">{(['palestra', 'casa'] as Place[]).map(p => <button type="button" key={p} class={d.place === p ? 'sel' : ''} aria-pressed={d.place === p} disabled={logs(d).length > 0 && d.place !== p} onClick={() => { local.set(PLACE, p); set(x => ({ ...x, place: p })) }}>{p === 'palestra' ? 'Palestra' : 'Corpo libero'}</button>)}</div>
+      <p class="sub">{listOf(sheet, d.place)}.</p>
+      {jumps && <Note tone="stop">Niente saltelli oggi: tornano quando dolore e gonfiore sono passati.</Note>}
       {items.map(({ ex, s }) => <Card key={ex.id} ex={ex} s={s} d={d} set={set} onDone={rest} ok={ok} />)}
       <Scale label="Quanta fatica?" max={10} value={fatica} onChange={setFatica} />
       <PainPicker value={pains} onChange={setPains} />
