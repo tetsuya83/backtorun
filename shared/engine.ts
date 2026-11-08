@@ -13,14 +13,18 @@ export interface Planned extends Omit<Workout, 'updatedAt'> { date: string; mode
 export interface Week { week: number | string; phase: number; scarico: boolean; skippable: boolean; total: number | null; sessions: Session[]; uid?: string; pause?: boolean; edited?: boolean }
 export interface PlanMeta { phases: Record<string, string>; kind?: 'custom'; id?: string; name?: string; strengthDays?: Day[]; goal?: Omit<GoalInput, 'id' | 'resume'> }
 export interface Plan { meta: PlanMeta; weeks: Week[]; maintenance: Week[] }
-export interface State { startDate: string; startWeek: number; skips: number[]; repeats: number[]; raceDate: string | null; raceName?: string | null; mode?: 'base' | 'custom'; hrMax?: number | null; watch?: string | null; zones?: string[] | null; weather?: WeatherPrefs | null; planned?: Planned[]; restart?: boolean; round?: number; other?: Partial<State> | null; baseDays?: BaseDays | null; testRemind?: boolean; testSnooze?: string | null; adaptSeen?: string[]; watchSync?: boolean; newsSeen?: string | null }
+export interface State { startDate: string; startWeek: number; skips: number[]; repeats: number[]; raceDate: string | null; raceName?: string | null; mode?: 'base' | 'custom'; hrMax?: number | null; watch?: string | null; zones?: string[] | null; weather?: WeatherPrefs | null; planned?: Planned[]; restart?: boolean; round?: number; other?: Partial<State> | null; baseDays?: BaseDays | null; testRemind?: boolean; testSnooze?: string | null; adaptSeen?: string[]; watchSync?: boolean; newsSeen?: string | null; resumes?: Resume[]; shoes?: Shoe[]; defaultShoe?: string | null; hrZones?: HrZones | null }
+/** Ripresa dopo uno stop: dal lunedì indicato il piano riparte dalla settimana scelta. */
+export interface Resume { monday: string; week: number | null; from: string; to: string; reason: 'malattia' | 'dolore' | 'altro'; trials?: string[] }
+export interface Shoe { id: string; name: string; startKm: number; limitKm: number; since: string; retired?: boolean }
+export interface HrZones { mode: 'max' | 'riserva' | 'mano'; rest?: number | null; bounds?: number[] | null }
 /** Giorni scelti per la Maratona graduale: le sue quattro uscite e la forza. */
 export interface BaseDays { days: Day[]; long: Day; strength: Day[] }
 export interface Activity {
   id: string; date: string; type: 'corsa' | 'forza' | 'nuoto' | 'bici' | 'altro'; sessionKey?: string | null; source: 'manuale' | 'fit' | 'gpx' | 'tcx' | 'gps' | 'intervals'; externalId?: string | null
   km?: number | null; seconds?: number | null; hrAvg?: number | null; hrMax?: number | null; hrLast?: number | null
   splits?: string | null; fiato?: number | null; fatica?: number | null; knee?: number | null; swelling?: boolean | null; locked?: boolean | null
-  note?: string | null; trace?: [number, number | null, number | null, (number | null)?, (number | null)?][] | null; cadence?: number | null; ascent?: number | null; sets?: ExerciseLog[] | null; updatedAt?: number; pains?: Pain[] | null; guide?: Lap[] | null
+  note?: string | null; trace?: [number, number | null, number | null, (number | null)?, (number | null)?][] | null; cadence?: number | null; ascent?: number | null; sets?: ExerciseLog[] | null; updatedAt?: number; pains?: Pain[] | null; guide?: Lap[] | null; shoe?: string | null
 }
 export interface Slot extends Week { monday: string; key: string; maintenance?: boolean; occurrence: number }
 
@@ -103,14 +107,21 @@ export function workoutError(w: any): string | null {
   if (!n || n.length > 60) return 'Scrivi un nome, massimo 60 caratteri.'
   return blocksError(w.blocks)
 }
+/** Percorre le settimane; a ogni ripresa torna alla settimana scelta, con chiavi nuove perché le sedute rifatte non risultino già fatte. */
+function walk<T extends { n: number; key: string }>(seq: T[], st: State, now: () => string, emit: (x: T, key: string) => void) {
+  const res = (st.resumes ?? []).filter(r => r.week != null).sort((a, b) => a.monday.localeCompare(b.monday))
+  let k = 0
+  for (let j = 0; j < seq.length; j++) {
+    while (k < res.length && now() >= mondayOf(res[k].monday)) { const w = res[k].week!, at = seq.findIndex(x => x.n >= w); k++; if (at >= 0) j = at }
+    emit(seq[j], k ? `s${k}.${seq[j].key}` : seq[j].key)
+  }
+}
 function baseTimeline(plan: Plan, st: State): Timeline {
   const slots: Slot[] = []
   let monday = mondayOf(st.startDate)
   if (isCustom(plan)) {
-    for (const w of plan.weeks) {
-      const times = 1 + st.repeats.filter(r => r === w.week).length
-      for (let i = 0; i < times; i++) { slots.push({ ...w, monday, key: `${w.uid ?? 'w' + w.week}.${i}`, occurrence: i }); monday = addDays(monday, 7) }
-    }
+    const seq = plan.weeks.flatMap(w => Array.from({ length: 1 + st.repeats.filter(r => r === w.week).length }, (_, i) => ({ w, n: w.week as number, key: `${w.uid ?? 'w' + w.week}.${i}`, i })))
+    walk(seq, st, () => monday, (x, key) => { slots.push({ ...x.w, monday, key, occurrence: x.i }); monday = addDays(monday, 7) })
     const last = slots.at(-1)!.monday
     return { slots, raceTooClose: !!st.raceDate && last > mondayOf(st.raceDate), earliestRace: addDays(last, 6), spareWeeks: 0 }
   }
@@ -118,12 +129,8 @@ function baseTimeline(plan: Plan, st: State): Timeline {
     slots.push({ ...w, monday, key, occurrence, maintenance }); monday = addDays(monday, 7)
   }
   const pre = plan.weeks.filter(w => (w.week as number) >= st.startWeek && (w.week as number) <= 34)
-  for (const w of pre) {
-    const n = w.week as number
-    if (st.skips.includes(n)) continue
-    const times = 1 + st.repeats.filter(r => r === n).length
-    for (let i = 0; i < times; i++) push(w, `w${n}.${i}`, i)
-  }
+  const seq = pre.filter(w => !st.skips.includes(w.week as number)).flatMap(w => Array.from({ length: 1 + st.repeats.filter(r => r === w.week).length }, (_, i) => ({ w, n: w.week as number, key: `w${w.week}.${i}`, i })))
+  walk(seq, st, () => monday, (x, key) => push(x.w, key, x.i))
   const earliestStart = monday
   const earliestRace = addDays(earliestStart, 7 * SPECIFIC_WEEKS - 1)
   const specific = plan.weeks.filter(w => (w.week as number) >= 35)
