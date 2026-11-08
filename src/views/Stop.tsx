@@ -50,7 +50,7 @@ export function StopView({ route }: { route: string }) {
       <h2>{p.week ? `Torna alla settimana ${p.week}` : 'Riprendi da dove eri'}</h2>
       <ol class="steps">
         {p.trial && <li><span><b>Due uscite di prova</b>: corsa facile di 20 minuti, al posto delle prossime due corse del piano.</span></li>}
-        {p.week ? <li><span>{p.trial ? 'Se il dolore resta entro 2, ' : ''}da questa settimana fai la <b>settimana {p.week}</b> invece della {p.from}. Il calendario slitta di conseguenza.</span></li>
+        {p.week ? <li><span>{p.trial ? 'Se il dolore resta entro 2, ' : ''}da questa settimana {p.week === p.from ? <>rifai la <b>settimana {p.week}</b></> : <>fai la <b>settimana {p.week}</b> invece della {p.from}</>}. Il calendario slitta di conseguenza.</span></li>
           : <li><span>{p.days < 7 ? 'Meno di una settimana: non serve tornare indietro.' : p.note ?? 'Il piano resta com\'è.'}</span></li>}
         {reason === 'malattia' && <li><span>Dopo febbre o influenza aspetta almeno un giorno senza sintomi prima di correre.</span></li>}
         {reason === 'dolore' && <li><span>Se durante le prove il dolore supera 2 su 10, fermati e fatti vedere.</span></li>}

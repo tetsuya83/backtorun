@@ -6,6 +6,30 @@ Numerazione: il numero centrale cresce quando cambia una funzione, l'ultimo quan
 
 Le sezioni ammesse in ogni versione sono Aggiunto, Modificato e Tolto.
 
+## 1.24.0 - 2026-11-08
+
+### In breve
+
+- Schede di forza precise: A e B, diverse per ogni fase del piano
+- Ti sei fermato? Segna lo stop e l'app propone da dove ripartire
+- Tieni il conto dei km delle tue scarpe, anche già usate
+- Il tuo ritmo facile, calcolato dalle tue corse
+- Zone cardio anche con la FC a riposo o scritte a mano
+
+### Aggiunto
+
+- Schede di forza A e B per i due giorni di forza, in palestra o a corpo libero, diverse per Ritorno, Base, Costruzione e Specifico, con nome, durata stimata ed esercizi in Oggi e nel Piano.
+- Saltelli a caviglie rigide nelle fasi di costruzione e specifica, tolti da soli in caso di dolore o gonfiore, ed esercizio di equilibrio su una gamba.
+- Rifinitura della forza: nelle due settimane prima della gara una sola scheda corta di attivazione, nella settimana della gara niente forza.
+- Ripresa dopo uno stop: domanda in Oggi dopo 8 giorni senza corse previste, pagina per segnare date e motivo, proposta della settimana da cui ripartire e due uscite di prova dopo un dolore o uno stop lungo. Si conferma e si annulla a mano.
+- Scarpe in Profilo: km di partenza, limite, paio predefinito assegnato alle corse nuove, scelta del paio nella corsa, avviso vicino al limite e scarpe ritirate.
+- Ritmo facile in Andamento, dalle corse continue facili delle ultime 4 settimane, con andamento settimanale e riferimento nelle sedute facili di Oggi.
+- Zone cardio con la riserva cardiaca (FC massima e a riposo) o scritte a mano, con le zone vicine che si adeguano.
+
+### Modificato
+
+- La forza a casa si chiama ora Corpo libero, e ogni scheda ha meno esercizi della lista unica di prima.
+
 ## 1.23.0 - 2026-11-07
 
 ### In breve
