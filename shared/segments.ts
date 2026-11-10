@@ -4,8 +4,8 @@ import type { Activity } from './engine'
 import { blocksOf, guideSteps, type Block, type GStep, type Lap } from './blocks'
 
 type Trace = NonNullable<Activity['trace']>
-/** Un lap dell'orologio, già ridotto a durata, metri e battito medio. */
-export interface RawLap { sec: number; m: number; hr: number | null }
+/** Un lap dell'orologio, già ridotto a durata, metri e battito medio. start: secondi dall'inizio; auto: autolap a distanza. */
+export interface RawLap { sec: number; m: number; hr: number | null; start?: number | null; auto?: boolean }
 
 const WALK_SPEED = 1.9 // sotto i 9'00" al km è cammino
 const RUN_CADENCE = 135 // passi al minuto: sopra si corre
@@ -19,15 +19,29 @@ const toLap = (s: GStep, sec: number, m: number, hr: number | null): Lap => ({ l
 /* ---------- Lap dell'orologio ---------- */
 /** Fa coincidere i lap con i passi del piano; se il numero non torna, li classifica per ritmo. */
 export function fromLaps(raw: RawLap[] | null | undefined, steps: GStep[] | null): Lap[] | null {
-  let l = (raw ?? []).filter(x => x.sec > 0)
-  while (l.length > 1 && l.at(-1)!.sec < 15 && l.at(-1)!.m < 30) l = l.slice(0, -1) // il lap vuoto chiuso a fine allenamento
-  if (l.length < 2) return null
+  let all = (raw ?? []).filter(x => x.sec > 0)
+  if (all.filter(x => !x.auto).length >= 2) all = all.filter(x => !x.auto) // l'autolap al km non è un tratto
+  const list = chains(all).map(trim).filter(c => c.length >= 2)
+  if (!list.length) return null
   if (steps && structured(steps)) {
-    const fit = align(l, steps)
-    if (fit) return fit
+    const best = list.map(c => align(c, steps)).filter((x): x is { laps: Lap[]; err: number } => !!x).sort((a, b) => a.err - b.err)[0]
+    if (best) return best.laps
   }
-  return byPace(l)
+  return list.map(byPace).filter((x): x is Lap[] => !!x).sort((a, b) => b.length - a.length)[0] ?? null
 }
+const trim = (l: RawLap[]) => { while (l.length > 1 && l.at(-1)!.sec < 15 && l.at(-1)!.m < 30) l = l.slice(0, -1); return l } // il lap vuoto chiuso a fine allenamento
+/** Alcuni orologi scrivono insieme i lap dei tratti e quelli dell'autolap al km, che si sovrappongono: qui si separano in serie. */
+export function chains(l: RawLap[]): RawLap[][] {
+  if (l.some(x => x.start == null)) return [l]
+  const sorted = [...l].sort((a, b) => a.start! - b.start! || a.sec - b.sec), out: { end: number; laps: RawLap[] }[] = []
+  for (const x of sorted) {
+    const c = out.filter(c => c.end <= x.start! + 3).sort((a, b) => b.end - a.end)[0] // la serie che finisce più vicino all'inizio del lap
+    if (c) { c.laps.push(x); c.end = x.start! + x.sec } else out.push({ end: x.start! + x.sec, laps: [x] })
+  }
+  return out.map(c => c.laps)
+}
+/** Tratti salvati che durano più della corsa: lap sovrapposti letti prima della correzione, da rileggere. */
+export const badSegments = (a: Activity) => !!a.guide?.length && !!a.seconds && a.guide.reduce((x, l) => x + l.sec, 0) > a.seconds * 1.05 + 30
 /** Errore medio tra lap e passi del piano, in proporzione alla durata prevista. */
 function gap(l: RawLap[], steps: GStep[], o: number) {
   let e = 0, n = 0
@@ -37,7 +51,7 @@ function gap(l: RawLap[], steps: GStep[], o: number) {
   }
   return n ? e / n : Infinity
 }
-function align(l: RawLap[], steps: GStep[]): Lap[] | null {
+function align(l: RawLap[], steps: GStep[]): { laps: Lap[]; err: number } | null {
   let best = -1, err = Infinity
   for (let o = 0; o <= Math.max(0, l.length - steps.length); o++) { const e = gap(l, steps, o); if (e < err) { err = e; best = o } }
   if (best < 0 || err > .35) return null
@@ -48,7 +62,7 @@ function align(l: RawLap[], steps: GStep[]): Lap[] | null {
   l.slice(0, best).forEach(x => out.push(extra(x, 'Prima della seduta')))
   for (let i = 0; i < used; i++) { const x = l[best + i]; out.push(toLap(steps[i], x.sec, x.m, x.hr)) }
   l.slice(best + used).forEach(x => out.push(extra(x, 'Dopo la seduta')))
-  return out
+  return { laps: out, err }
 }
 /** Senza piano: i lap più veloci sono corsa, gli altri cammino o recupero. Lap tutti simili (autolap al km) non dicono nulla. */
 function byPace(l: RawLap[]): Lap[] | null {
@@ -147,7 +161,7 @@ export function workSummary(laps: Lap[] | null | undefined): WorkSummary | null 
 }
 /** I tratti di una corsa: lap dell'orologio o cronometro, altrimenti ricostruiti dal piano. */
 export const segmentsOf = (a: Activity, steps: GStep[] | null): Lap[] | null =>
-  a.guide?.length ? withHr(a.guide, a.trace) : fromTrace(a.trace, steps)
+  a.guide?.length && !badSegments(a) ? withHr(a.guide, a.trace) : fromTrace(a.trace, steps)
 /** I passi di una seduta del piano, solo per la corsa. */
 export function stepsOf(ses: { text: string; km?: number | null; blocks?: Block[] | null } | null | undefined): GStep[] | null {
   if (!ses || ses.km === 0) return null

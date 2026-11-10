@@ -4,7 +4,7 @@ import { buildTimeline, planFor, sessionKey } from '../../shared/engine'
 import { drift, hrMaxOf, kmSplits, timeInZones, zonesOf } from '../../shared/analysis'
 import { fmtDate } from '../guide'
 import { paceOf, parseActivityFile, timeOf } from '../fit'
-import { isWork, lapNames, segmentsOf, stepsOf, structured, watchSegments, workSummary } from '../../shared/segments'
+import { badSegments, isWork, lapNames, segmentsOf, stepsOf, structured, watchSegments, workSummary } from '../../shared/segments'
 import type { GStep } from '../../shared/blocks'
 import type { Activity } from '../../shared/engine'
 import { Line } from './Trends'
@@ -20,7 +20,7 @@ async function upgrade(a: Activity, steps: GStep[]) {
     if (!r.ok) return
     const seg = watchSegments((await parseActivityFile(await r.arrayBuffer())).lapList ?? [], steps)
     const now = data.value?.activities.find(x => x.id === a.id)
-    if (seg && now && !now.guide?.length) saveActivity({ ...now, ...seg })
+    if (seg && now && (!now.guide?.length || badSegments(now))) saveActivity({ ...now, guide: null, ...seg })
   } catch { /* resta la ricostruzione dal piano */ }
 }
 const pace = (s: number | null) => s ? `${mmss(s)}/km` : ''
@@ -30,7 +30,7 @@ export function RunView({ route }: { route: string }) {
   const ses = a?.sessionKey && t ? t.slots.flatMap(s => s.sessions.map(x => [sessionKey(s, x.day), x] as const)).find(([k]) => k === a.sessionKey)?.[1] : undefined
   const steps = a?.type === 'corsa' ? stepsOf(ses) : null
   useEffect(() => {
-    if (a?.externalId && !a.guide?.length && !a.segFrom && d.me?.intervals && steps && structured(steps)) void upgrade(a, steps)
+    if (a?.externalId && ((!a.guide?.length && !a.segFrom) || (a.segFrom === 'orologio' && badSegments(a))) && d.me?.intervals && steps && structured(steps)) void upgrade(a, steps)
   }, [a?.id, a?.guide, a?.segFrom])
   if (!a) return <div class="stack"><section class="head"><h1>Corsa non trovata</h1></section><a class="btn ghost" href="#/andamento">Torna ad Andamento</a></div>
   const tr = a.trace ?? [], max = hrMaxOf(d), zones = zonesOf(d)
@@ -44,7 +44,7 @@ export function RunView({ route }: { route: string }) {
   const hr = series(1), alt = series(3), cad = series(4)
   const range = (l: { v: number }[], pad: number) => { const v = l.map(x => x.v); return { min: Math.min(...v) - pad, max: Math.max(...v) + pad } }
   const segs = a.type === 'corsa' ? segmentsOf(a, steps) : null, names = segs ? lapNames(segs) : [], work = workSummary(segs)
-  const from = a.segFrom === 'orologio' ? "Dai lap dell'orologio." : a.guide?.length ? 'Dal cronometro guidato.' : 'Ricostruiti dal piano della seduta, tagliati dove cambia il passo.'
+  const from = a.guide?.length && badSegments(a) ? 'Ricostruiti dal piano della seduta, tagliati dove cambia il passo.' : a.segFrom === 'orologio' ? "Dai lap dell'orologio." : a.guide?.length ? 'Dal cronometro guidato.' : 'Ricostruiti dal piano della seduta, tagliati dove cambia il passo.'
   const stats = [[a.km ? `${a.km}` : null, 'km'], [timeOf(a.seconds), 'tempo'], [paceOf(a.km, a.seconds), work ? 'ritmo medio' : 'ritmo'], [work?.pace ? pace(work.pace) : null, 'ritmo corsa'], [a.hrAvg, 'FC media'], [a.hrMax, 'FC max'], [a.cadence, 'passi/min'], [a.ascent != null ? `${a.ascent} m` : null, 'dislivello']].filter(x => x[0] != null)
   return (
     <div class="stack">

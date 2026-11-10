@@ -42,7 +42,7 @@ export function parseFit(buf: ArrayBuffer): FitResult {
   const trace = rec.filter((_, i) => i % step === 0).map(r => { const q = altOf(r); return [Math.round((r.timestamp.getTime() - t00) / 1000), r.heartRate ?? null, r.distance != null ? Math.round(r.distance) : null, q != null ? Math.round(q) : null, r.cadence ? Math.round((r.cadence + (r.fractionalCadence ?? 0)) * twice) : null] as [number, number | null, number | null, number | null, number | null] })
   return {
     date, sport, laps: laps.length, source: 'fit',
-    lapList: laps.map(l => ({ sec: l.totalTimerTime ?? l.totalElapsedTime ?? 0, m: l.totalDistance ?? 0, hr: l.avgHeartRate ?? null })),
+    lapList: laps.map(l => ({ sec: l.totalTimerTime ?? l.totalElapsedTime ?? 0, m: l.totalDistance ?? 0, hr: l.avgHeartRate ?? null, start: l.startTime ? (l.startTime.getTime() - start.getTime()) / 1000 : null, auto: /^(distance|position)/i.test(String(l.lapTrigger ?? '')) })),
     type: sport === 'cycling' ? 'bici' : sport === 'swimming' ? 'nuoto' : sport === 'running' || sport === 'walking' ? 'corsa' : 'altro',
     km: Math.round(dist / 10) / 100, seconds: Math.round(secs),
     hrAvg: sess?.avgHeartRate ?? avg(hrs), hrMax: sess?.maxHeartRate ?? (hrs.length ? Math.max(...hrs) : null), hrLast: avg(lastKm),

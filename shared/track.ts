@@ -63,7 +63,7 @@ export function parseTcx(xml: string): Imported {
     return [{ t: Date.parse(time), lat: numTag(b, 'LatitudeDegrees'), lon: numTag(b, 'LongitudeDegrees'), alt: numTag(b, 'AltitudeMeters'), dist: numTag(b, 'DistanceMeters'), hr: hrBlock ? numTag(hrBlock, 'Value') : undefined, cad: numTag(b, 'RunCadence', 'Cadence') }]
   })
   const sec = laps.reduce((a, l) => a + (numTag(l, 'TotalTimeSeconds') ?? 0), 0), m = laps.reduce((a, l) => a + (numTag(l.replace(/<Track>[\s\S]*<\/Track>/i, ''), 'DistanceMeters') ?? 0), 0)
-  const lapList = laps.map(l => { const head = l.replace(/<Track>[\s\S]*<\/Track>/i, ''), hr = head.match(/<AverageHeartRateBpm\b[\s\S]*?<\/AverageHeartRateBpm>/i)?.[0]; return { sec: numTag(head, 'TotalTimeSeconds') ?? 0, m: numTag(head, 'DistanceMeters') ?? 0, hr: hr ? numTag(hr, 'Value') ?? null : null } })
+  const lapList = laps.map(l => { const head = l.replace(/<Track>[\s\S]*<\/Track>/i, ''), hr = head.match(/<AverageHeartRateBpm\b[\s\S]*?<\/AverageHeartRateBpm>/i)?.[0]; const st = Date.parse(head.match(/StartTime="([^"]+)"/i)?.[1] ?? ''), t0 = Date.parse(tag(xml, 'Time') ?? ''); return { sec: numTag(head, 'TotalTimeSeconds') ?? 0, m: numTag(head, 'DistanceMeters') ?? 0, hr: hr ? numTag(hr, 'Value') ?? null : null, start: isFinite(st) && isFinite(t0) ? (st - t0) / 1000 : null, auto: /^Distance|^Location/i.test(tag(head, 'TriggerMethod') ?? '') } })
   return { ...summarize(pts, SPORT(sport), { laps: laps.length, seconds: sec || undefined, km: m ? m / 1000 : undefined, source: 'tcx' }), lapList }
 }
 /** Decide il formato dal contenuto, non dal nome: alcune app salvano con estensioni strane. */

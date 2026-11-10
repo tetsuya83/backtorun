@@ -6,6 +6,18 @@ Numerazione: il numero centrale cresce quando cambia una funzione, l'ultimo quan
 
 Le sezioni ammesse in ogni versione sono Aggiunto, Modificato e Tolto.
 
+## 1.25.1 - 2026-11-10
+
+### In breve
+
+- Tratti corretti quando l'orologio segna anche i lap a ogni km
+- Le corse con tratti sbagliati si sistemano da sole all'apertura
+
+### Modificato
+
+- I lap dell'autolap al km non finiscono più tra i tratti: si scartano, e quando si sovrappongono ai lap dei tratti le due serie vengono separate.
+- Le corse salvate con tratti più lunghi della corsa stessa rileggono il file dell'orologio all'apertura e, nel frattempo, mostrano i tratti ricostruiti dal piano.
+
 ## 1.25.0 - 2026-11-10
 
 ### In breve
