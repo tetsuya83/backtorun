@@ -6,6 +6,16 @@ Numerazione: il numero centrale cresce quando cambia una funzione, l'ultimo quan
 
 Le sezioni ammesse in ogni versione sono Aggiunto, Modificato e Tolto.
 
+## 1.25.2 - 2026-11-10
+
+### In breve
+
+- Torna l'ultimo recupero quando l'orologio non lo registra
+
+### Modificato
+
+- Se i lap dell'orologio finiscono prima della corsa, il tempo che resta nella traccia diventa il passo successivo della seduta, di solito il recupero finale, con tempo, metri e battito.
+
 ## 1.25.1 - 2026-11-10
 
 ### In breve

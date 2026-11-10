@@ -160,8 +160,23 @@ export function workSummary(laps: Lap[] | null | undefined): WorkSummary | null 
   return { n: w.length, sec, m, pace: m > 0 ? Math.round(sec / m * 1000) : null, hr: ht ? Math.round(h.reduce((a, l) => a + l.hr! * l.sec, 0) / ht) : null }
 }
 /** I tratti di una corsa: lap dell'orologio o cronometro, altrimenti ricostruiti dal piano. */
-export const segmentsOf = (a: Activity, steps: GStep[] | null): Lap[] | null =>
-  a.guide?.length && !badSegments(a) ? withHr(a.guide, a.trace) : fromTrace(a.trace, steps)
+export function segmentsOf(a: Activity, steps: GStep[] | null): Lap[] | null {
+  if (!a.guide?.length || badSegments(a)) return fromTrace(a.trace, steps)
+  const g = withHr(a.guide, a.trace)
+  return a.segFrom === 'orologio' ? withTail(g, a.trace, steps) : g
+}
+/** Alcuni orologi non chiudono un lap per l'ultimo passo (il recupero finale): il tempo che resta nella traccia diventa quel passo. */
+export function withTail(laps: Lap[], tr: Trace | null | undefined, steps: GStep[] | null): Lap[] {
+  if (!tr?.length) return laps
+  const t0 = tr[0][0], covered = laps.reduce((x, l) => x + l.sec, 0), from = t0 + covered, rest = tr.at(-1)![0] - from
+  if (rest < 20) return laps
+  const pts = tr.filter(p => p[0] >= from), dist = (p?: Trace[number]) => { const i = p ? tr.indexOf(p) : -1; for (let j = i; j >= 0; j--) if (tr[j][2] != null) return tr[j][2]!; return 0 }
+  const m = Math.max(0, dist(tr.at(-1)) - dist(tr.filter(p => p[0] <= from).at(-1))), hrs = pts.map(p => p[1]).filter((x): x is number => !!x)
+  const hr = hrs.length ? Math.round(hrs.reduce((x, y) => x + y, 0) / hrs.length) : null
+  const i = laps.filter(l => !/^(Prima|Dopo)/.test(l.label)).length, next = steps && structured(steps) ? steps[i] : undefined
+  if (next) return [...laps, toLap(next, rest, m, hr)]
+  return [...laps, { label: 'Dopo la seduta', sec: Math.round(rest), m: Math.round(m), effort: m / rest < WALK_SPEED ? 'walk' : 'easy', hr, work: false }]
+}
 /** I passi di una seduta del piano, solo per la corsa. */
 export function stepsOf(ses: { text: string; km?: number | null; blocks?: Block[] | null } | null | undefined): GStep[] | null {
   if (!ses || ses.km === 0) return null

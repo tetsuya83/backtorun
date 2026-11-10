@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { guideSteps, parseBlocks } from '../shared/blocks'
-import { badSegments, fromLaps, fromTrace, lapNames, workSummary, withHr } from '../shared/segments'
+import { badSegments, fromLaps, segmentsOf, fromTrace, lapNames, workSummary, withHr } from '../shared/segments'
 import real from './fixtures/walk-run-2026-11-10.json'
 
 const steps = (t: string) => guideSteps(parseBlocks(t)!)
@@ -66,5 +66,22 @@ describe('lap del Suunto del 10 novembre: tratti e autolap al km mescolati', () 
     const bad = mixed.map(([, sec, m, hr]) => ({ label: 'Corri', sec, m, effort: 'easy' as const, hr, work: true }))
     expect(badSegments({ id: 'x', date: '2026-11-10', type: 'corsa', source: 'fit', seconds: 1513, guide: bad })).toBe(true)
     expect(badSegments({ id: 'x', date: '2026-11-10', type: 'corsa', source: 'fit', seconds: 1513, guide: fromLaps(raw(true, true), walkRun) })).toBe(false)
+  })
+})
+
+describe('ultimo recupero senza lap', () => {
+  it('lo ricava dalla traccia, come nella corsa del 10 novembre', () => {
+    const steps9 = fromLaps([[180, 417], [120, 161], [180, 442], [120, 175], [180, 451], [120, 192], [180, 450], [120, 178], [180, 488]].map(([sec, m]) => ({ sec, m, hr: 150 })), walkRun)!
+    expect(steps9).toHaveLength(9)
+    const l = segmentsOf({ id: 'x', date: '2026-11-10', type: 'corsa', source: 'fit', seconds: 1513, trace: real as any, guide: steps9, segFrom: 'orologio' }, walkRun)!
+    expect(l).toHaveLength(10)
+    expect(lapNames(l)[9]).toBe('Cammino')
+    expect(l[9]).toMatchObject({ effort: 'walk', work: false })
+    expect(l[9].sec).toBeGreaterThan(110); expect(l[9].sec).toBeLessThan(140)
+    expect(l[9].m).toBeGreaterThan(120); expect(l[9].m).toBeLessThan(220)
+  })
+  it('non aggiunge nulla se i lap coprono tutta la corsa', () => {
+    const full = fromTrace(real as any, walkRun)!
+    expect(segmentsOf({ id: 'x', date: '2026-11-10', type: 'corsa', source: 'fit', seconds: 1513, trace: real as any, guide: full, segFrom: 'orologio' }, walkRun)).toHaveLength(10)
   })
 })
