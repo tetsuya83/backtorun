@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { data, deleteActivity, imports, saveActivity, uid } from '../api'
 import { buildTimeline, isCustom, planFor, sessionDate, sessionKey, type Activity } from '../../shared/engine'
 import { fmtDate, PAIN as words, todayISO, WEEKDAY } from '../guide'
+import { stepsOf, watchSegments } from '../../shared/segments'
 import { shoeOf } from '../../shared/shoes'
 import { breathHint, Field, goBack, nav, Note, Scale } from '../ui'
 import { paceOf, parseActivityFile, timeOf, type FitResult } from '../fit'
@@ -40,8 +41,9 @@ export function Log({ route }: { route: string }) {
   const linked = options.find(o => o.key === a.sessionKey)
   const applyFit = (f: FitResult, name: string) => {
     const match = f.type === 'corsa' ? options.find(o => o.date === f.date) : undefined
-    const { sport, laps, ...rest } = f
-    setA(x => ({ ...x, ...rest, sessionKey: match?.key ?? x.sessionKey ?? null }))
+    const { sport, laps, lapList, ...rest } = f
+    const steps = stepsOf((match ?? options.find(o => o.key === a.sessionKey))?.x), seg = f.type === 'corsa' ? watchSegments(lapList, steps) : null
+    setA(x => ({ ...x, ...rest, ...(seg?.guide || !x.guide?.length ? seg : null), sessionKey: match?.key ?? x.sessionKey ?? null }))
     setDur(split(f.seconds)); setErr('')
     setMsg(`${name}: ${f.km} km in ${timeOf(f.seconds)}${match ? ', collegato alla seduta del giorno' : ', data ' + fmtDate(f.date, { day: 'numeric', month: 'long' })}.`)
   }

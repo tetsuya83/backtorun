@@ -2,10 +2,12 @@ import { describe, it, expect } from 'vitest'
 import { Encoder, Profile } from '@garmin/fitsdk'
 import { parseFit } from '../src/fit'
 const M = Profile.MesgNum, start = new Date('2026-11-10T06:00:00Z'), at = (s: number) => new Date(start.getTime() + s * 1000)
-function fit(session: Record<string, unknown>, rec: (s: number) => Record<string, unknown>) {
+function fit(session: Record<string, unknown>, rec: (s: number) => Record<string, unknown>, laps: [number, number, number][] = []) {
   const e = new Encoder(), T = 2040, D = 5000
   e.onMesg(M.FILE_ID, { type: 'activity', manufacturer: 'suunto', product: 0, timeCreated: start, serialNumber: 1 })
   for (let s = 0; s <= T; s += 5) e.onMesg(M.RECORD, { timestamp: at(s), distance: D * s / T, heartRate: 150, ...rec(s) })
+  let t = 0
+  for (const [sec, m, hr] of laps) { e.onMesg(M.LAP, { timestamp: at(t + sec), startTime: at(t), totalElapsedTime: sec, totalTimerTime: sec, totalDistance: m, avgHeartRate: hr }); t += sec }
   e.onMesg(M.SESSION, { timestamp: at(T), startTime: start, sport: 'running', totalElapsedTime: T, totalTimerTime: T, totalDistance: D, firstLapIndex: 0, numLaps: 1, ...session })
   e.onMesg(M.ACTIVITY, { timestamp: at(T), numSessions: 1, type: 'manual', event: 'activity', eventType: 'stop', totalTimerTime: T })
   const b = e.close(); return b.buffer.slice(b.byteOffset, b.byteOffset + b.length) as ArrayBuffer
@@ -23,5 +25,9 @@ describe('lettura FIT', () => {
   it('funziona senza quota né cadenza', () => {
     const r = parseFit(fit({}, () => ({})))
     expect(r.cadence).toBeNull(); expect(r.ascent).toBeNull(); expect(r.trace!.at(-1)![1]).toBe(150)
+  })
+  it('tiene i lap dell\'orologio per i tratti delle ripetute', () => {
+    const r = parseFit(fit({}, () => ({}), [[185, 440, 152], [118, 140, 110]]))
+    expect(r.lapList).toEqual([{ sec: 185, m: 440, hr: 152 }, { sec: 118, m: 140, hr: 110 }])
   })
 })

@@ -1,7 +1,9 @@
 import { Decoder, Stream } from '@garmin/fitsdk'
 import type { Activity } from '../shared/engine'
 import { parseXmlTrack } from '../shared/track'
-export type FitResult = Partial<Activity> & { date: string; sport: string; laps: number }
+import type { RawLap } from '../shared/segments'
+/** lapList: i lap dell'orologio, da cui si ricavano i tratti di una seduta a ripetute. */
+export type FitResult = Partial<Activity> & { date: string; sport: string; laps: number; lapList?: RawLap[] }
 const fmt = (s: number) => `${Math.floor(s / 60)}'${String(Math.round(s % 60)).padStart(2, '0')}"`
 const avg = (a: number[]) => a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length) : null
 
@@ -40,6 +42,7 @@ export function parseFit(buf: ArrayBuffer): FitResult {
   const trace = rec.filter((_, i) => i % step === 0).map(r => { const q = altOf(r); return [Math.round((r.timestamp.getTime() - t00) / 1000), r.heartRate ?? null, r.distance != null ? Math.round(r.distance) : null, q != null ? Math.round(q) : null, r.cadence ? Math.round((r.cadence + (r.fractionalCadence ?? 0)) * twice) : null] as [number, number | null, number | null, number | null, number | null] })
   return {
     date, sport, laps: laps.length, source: 'fit',
+    lapList: laps.map(l => ({ sec: l.totalTimerTime ?? l.totalElapsedTime ?? 0, m: l.totalDistance ?? 0, hr: l.avgHeartRate ?? null })),
     type: sport === 'cycling' ? 'bici' : sport === 'swimming' ? 'nuoto' : sport === 'running' || sport === 'walking' ? 'corsa' : 'altro',
     km: Math.round(dist / 10) / 100, seconds: Math.round(secs),
     hrAvg: sess?.avgHeartRate ?? avg(hrs), hrMax: sess?.maxHeartRate ?? (hrs.length ? Math.max(...hrs) : null), hrLast: avg(lastKm),

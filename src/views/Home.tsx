@@ -15,6 +15,7 @@ import { learnFor } from '../learn'
 import { sessionMin } from '../../shared/tips'
 import { cooldownFor, routineById, totalOf, warmupFor, type Routine } from '../../shared/training'
 import { paceOf, timeOf } from '../fit'
+import { segmentsOf, stepsOf, workSummary } from '../../shared/segments'
 import { shoeUse } from '../../shared/shoes'
 import { easyPace, paceRange, walkFrom } from '../../shared/paces'
 import { zonesOf } from '../../shared/analysis'
@@ -113,7 +114,7 @@ function TodayCard() {
     {facts && <p class="facts-l">{facts}</p>}
     {pace && <p class="sub">Il tuo ritmo facile: circa {paceRange(pace)} al km. Se il fiato sale, rallenta: conta il fiato, non il numero.</p>}
     {done ? <>
-      <div class="done"><strong>Registrato</strong><span>{[done.km ? done.km + ' km' : null, timeOf(done.seconds), paceOf(done.km, done.seconds), done.fatica ? `fatica ${done.fatica}` : null].filter(Boolean).join(', ') || 'Bel lavoro'}</span><a href={`#/registra?id=${done.id}`}>Modifica</a></div>
+      <div class="done"><strong>Registrato</strong><span>{[done.km ? done.km + ' km' : null, timeOf(done.seconds), (() => { const w = done.type === 'corsa' ? workSummary(segmentsOf(done, stepsOf(ses))) : null; return w?.pace ? `corsa ${Math.floor(w.pace / 60)}'${String(w.pace % 60).padStart(2, '0')}"/km` : paceOf(done.km, done.seconds) })(), done.fatica ? `fatica ${done.fatica}` : null].filter(Boolean).join(', ') || 'Bel lavoro'}</span><a href={`#/registra?id=${done.id}`}>Modifica</a></div>
       <div class="quick">
         <a href={`#/routine?id=${cool.id}`}><Ic d={ICON.clock} />{cool.name}</a>
         {done.trace?.length ? <a href={`#/corsa?id=${done.id}`}><Ic d={ICON.route} />Dettaglio corsa</a> : null}

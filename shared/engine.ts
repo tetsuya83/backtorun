@@ -24,7 +24,7 @@ export interface Activity {
   id: string; date: string; type: 'corsa' | 'forza' | 'nuoto' | 'bici' | 'altro'; sessionKey?: string | null; source: 'manuale' | 'fit' | 'gpx' | 'tcx' | 'gps' | 'intervals'; externalId?: string | null
   km?: number | null; seconds?: number | null; hrAvg?: number | null; hrMax?: number | null; hrLast?: number | null
   splits?: string | null; fiato?: number | null; fatica?: number | null; knee?: number | null; swelling?: boolean | null; locked?: boolean | null
-  note?: string | null; trace?: [number, number | null, number | null, (number | null)?, (number | null)?][] | null; cadence?: number | null; ascent?: number | null; sets?: ExerciseLog[] | null; sheet?: string | null; updatedAt?: number; pains?: Pain[] | null; guide?: Lap[] | null; shoe?: string | null
+  note?: string | null; trace?: [number, number | null, number | null, (number | null)?, (number | null)?][] | null; cadence?: number | null; ascent?: number | null; sets?: ExerciseLog[] | null; sheet?: string | null; updatedAt?: number; pains?: Pain[] | null; guide?: Lap[] | null; segFrom?: 'orologio' | 'nessuno' | null; shoe?: string | null
 }
 export interface Slot extends Week { monday: string; key: string; maintenance?: boolean; occurrence: number }
 

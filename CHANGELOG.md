@@ -6,6 +6,27 @@ Numerazione: il numero centrale cresce quando cambia una funzione, l'ultimo quan
 
 Le sezioni ammesse in ogni versione sono Aggiunto, Modificato e Tolto.
 
+## 1.25.0 - 2026-11-10
+
+### In breve
+
+- Ripetute divise in tratti: ogni corsa e ogni recupero a parte
+- Il ritmo dei soli tratti di corsa, senza il cammino
+- Le corse già importate si aggiornano da sole all'apertura
+
+### Aggiunto
+
+- Tratti nella pagina della corsa per le sedute a ripetute: tempo, metri, ritmo e battito di ogni corsa e recupero, con riepilogo dei soli tratti di corsa e indicazione della fonte.
+- Lettura dei lap dell'orologio dai file FIT e TCX, abbinati ai passi della seduta del piano; senza piano corsa e cammino si separano per ritmo, e l'autolap al km si ignora.
+- Ricostruzione dei tratti dal piano quando l'orologio non ha lap utili, con il cambio tra corsa e cammino cercato nella cadenza e nella velocità.
+- Ritmo corsa in alto nella pagina della corsa e in Oggi dopo la seduta.
+
+### Modificato
+
+- Le corse a ripetute importate da Intervals.icu prima di questa versione rileggono una volta il file dell'orologio quando le apri.
+- Le sedute a ripetute non entrano più nel grafico dell'efficienza in Z2 in Andamento.
+- Gli intertempi al km restano per le corse continue e non compaiono più nelle sedute a tratti.
+
 ## 1.24.0 - 2026-11-08
 
 ### In breve

@@ -8,6 +8,7 @@ import { addDays, buildTimeline, isCustom, planFor, sessionKey, upper, type Slot
 import { fmtDate, PAIN, todayISO } from '../guide'
 import { zoneCounts, zoneLabel } from '../../shared/pain'
 import { paceOf } from '../fit'
+import { stepsOf, structured, workSummary } from '../../shared/segments'
 
 const W = 340
 function Bars({ rows, title, unit }: { rows: { label: string; done: number; plan: number | null }[]; title: string; unit: string }) {
@@ -72,10 +73,12 @@ export function Trends({ embedded }: { embedded?: boolean }) {
   const fat = last.filter(a => a.fatica != null).map(a => ({ label: fmtDate(a.date, { day: 'numeric', month: 'short' }), v: a.fatica!, t: a.sessionKey ? upper(ses.get(a.sessionKey)?.fatica) : null }))
   const knee = last.filter(a => a.knee != null).map(a => ({ label: fmtDate(a.date, { day: 'numeric', month: 'short' }), v: a.knee! }))
   const z2 = zonesOf(d)?.[1] ?? null
+  // le sedute a ripetute mescolano corsa e recuperi: il loro ritmo medio non dice nulla sull'efficienza
+  const reps = (a: typeof runs[number]) => !!workSummary(a.guide) || structured(stepsOf(a.sessionKey ? ses.get(a.sessionKey) : null) ?? [])
   const loads = weeklyLoads(d.activities, today, 8), alert = loadAlert(loads), shown = loads.slice(Math.max(0, loads.findIndex(w => w.load > 0))), noLoad = loads.reduce((s, w) => s + w.missing, 0)
   const cad = samePace(runs).slice(-16).map(a => ({ label: fmtDate(a.date, { day: 'numeric', month: 'short' }), v: a.cadence! }))
   // efficienza: secondi al km alla stessa FC di Z2, più basso è meglio
-  const eff = runs.filter(a => z2 && a.km && a.seconds && a.hrAvg && a.hrAvg >= z2.lo && a.hrAvg <= z2.hi).slice(-16).map(a => ({ label: fmtDate(a.date, { day: 'numeric', month: 'short' }), v: Math.round(a.seconds! / a.km! ) }))
+  const eff = runs.filter(a => !reps(a) && z2 && a.km && a.seconds && a.hrAvg && a.hrAvg >= z2.lo && a.hrAvg <= z2.hi).slice(-16).map(a => ({ label: fmtDate(a.date, { day: 'numeric', month: 'short' }), v: Math.round(a.seconds! / a.km! ) }))
   const best = eff.length ? eff.reduce((m, x) => x.v < m ? x.v : m, 9999) : 0
   return (
     <div class="stack">

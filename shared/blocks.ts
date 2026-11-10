@@ -242,11 +242,12 @@ export function guideSteps(l: Block[], sport: Sport = 'corsa'): GStep[] {
   }
   return out
 }
-export interface Lap { label: string; sec: number; m: number; effort: Effort }
+/** Un tratto della seduta: dal cronometro guidato, dai lap dell'orologio o ricostruito dal piano. */
+export interface Lap { label: string; sec: number; m: number; effort: Effort; hr?: number | null; work?: boolean }
 export interface GuideState { i: number; t: number; m: number; total: number; dist: number; laps: Lap[]; done: boolean }
 export const startGuide = (): GuideState => ({ i: 0, t: 0, m: 0, total: 0, dist: 0, laps: [], done: false })
 const closeStep = (steps: GStep[], s: GuideState): GuideState => {
-  const c = steps[s.i], laps = [...s.laps, { label: c.label, sec: Math.round(s.t), m: Math.round(s.m), effort: c.effort }], i = s.i + 1
+  const c = steps[s.i], laps = [...s.laps, { label: c.label, sec: Math.round(s.t), m: Math.round(s.m), effort: c.effort, work: c.tone === 'work' }], i = s.i + 1
   return i >= steps.length ? { ...s, laps, done: true } : { ...s, i, t: 0, m: 0, laps }
 }
 /** Fa avanzare la seduta: tutto dipende da tempo e metri ricevuti, così uno stop del telefono non la sfasa. */
