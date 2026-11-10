@@ -42,10 +42,13 @@ export function Log({ route }: { route: string }) {
   const applyFit = (f: FitResult, name: string) => {
     const match = f.type === 'corsa' ? options.find(o => o.date === f.date) : undefined
     const { sport, laps, lapList, ...rest } = f
-    const steps = stepsOf((match ?? options.find(o => o.key === a.sessionKey))?.x), seg = f.type === 'corsa' ? watchSegments(lapList, steps) : null
-    setA(x => ({ ...x, ...rest, ...(seg?.guide || !x.guide?.length ? seg : null), sessionKey: match?.key ?? x.sessionKey ?? null }))
+    // lo stesso allenamento già registrato (per esempio rimandato dall'orologio): si completa quello, senza doppioni
+    const twin = existing ? undefined : d.activities.find(x => x.type === f.type && x.date === f.date && x.km && f.km && Math.abs(x.km - f.km) <= .15 && (!x.seconds || !f.seconds || Math.abs(x.seconds - f.seconds) <= 120))
+    const steps = stepsOf((match ?? options.find(o => o.key === (twin ?? a).sessionKey))?.x), seg = f.type === 'corsa' ? watchSegments(lapList, steps) : null
+    if (twin) setPains(painsOf(twin, 'ginocchio'))
+    setA(x => { const y = twin ?? x; return { ...y, ...rest, ...(seg?.guide || !y.guide?.length ? seg : null), sessionKey: y.sessionKey ?? match?.key ?? null } })
     setDur(split(f.seconds)); setErr('')
-    setMsg(`${name}: ${f.km} km in ${timeOf(f.seconds)}${match ? ', collegato alla seduta del giorno' : ', data ' + fmtDate(f.date, { day: 'numeric', month: 'long' })}.`)
+    setMsg(twin ? `${name}: questa corsa era già registrata. Aggiungo ${f.path ? 'il percorso e ' : ''}i dati del file, le tue note restano.` : `${name}: ${f.km} km in ${timeOf(f.seconds)}${match ? ', collegato alla seduta del giorno' : ', data ' + fmtDate(f.date, { day: 'numeric', month: 'long' })}.`)
   }
   const onFile = async (f?: File | null) => {
     if (!f) return

@@ -30,4 +30,11 @@ describe('lettura FIT', () => {
     const r = parseFit(fit({}, () => ({}), [[185, 440, 152], [118, 140, 110], [400, 1000, 150]]))
     expect(r.lapList).toEqual([{ sec: 185, m: 440, hr: 152, start: 0, auto: false }, { sec: 118, m: 140, hr: 110, start: 185, auto: false }, { sec: 400, m: 1000, hr: 150, start: 303, auto: true }])
   })
+  it('tiene il percorso GPS, in gradi', () => {
+    const sc = (d: number) => Math.round(d * 2 ** 31 / 180)
+    const r = parseFit(fit({}, s => ({ positionLat: sc(43.77 + s * 1e-5), positionLong: sc(11.25 + Math.sin(s / 200) * 1e-3) })))
+    expect(r.path!.length).toBeGreaterThan(10); expect(r.path!.length).toBeLessThanOrEqual(500)
+    expect(r.path![0][2]).toBeCloseTo(43.77, 4); expect(r.path![0][1]).toBeCloseTo(11.25, 3)
+    expect(parseFit(fit({}, () => ({}))).path).toBeNull()
+  })
 })

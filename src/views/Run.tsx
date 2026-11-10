@@ -1,9 +1,13 @@
-import { useEffect } from 'preact/hooks'
-import { data, saveActivity } from '../api'
+import { useEffect, useState } from 'preact/hooks'
+import { data, online, saveActivity, saveRoute, uid } from '../api'
+import { nav } from '../ui'
 import { buildTimeline, planFor, sessionKey } from '../../shared/engine'
 import { drift, hrMaxOf, kmSplits, timeInZones, zonesOf } from '../../shared/analysis'
 import { fmtDate } from '../guide'
 import { paceOf, parseActivityFile, timeOf } from '../fit'
+import { pathParts, routeFromRun } from '../../shared/path'
+import { MAX_ROUTES } from '../../shared/route'
+import { Thumb } from './Routes'
 import { badSegments, isWork, lapNames, segmentsOf, stepsOf, structured, watchSegments, workSummary } from '../../shared/segments'
 import type { GStep } from '../../shared/blocks'
 import type { Activity } from '../../shared/engine'
@@ -12,16 +16,35 @@ import { Line } from './Trends'
 const mmss = (s: number) => `${Math.floor(s / 60)}'${String(s % 60).padStart(2, '0')}"`
 const asked = new Set<string>()
 /** Corse importate prima dei tratti: si rilegge una volta il file dell'orologio da Intervals.icu e si salvano i suoi lap. */
-async function upgrade(a: Activity, steps: GStep[]) {
+/** Corse importate da Intervals.icu: si rilegge una volta il file per i tratti mancanti e per il percorso. */
+async function upgrade(a: Activity, steps: GStep[] | null) {
   if (asked.has(a.id)) return
   asked.add(a.id)
   try {
     const r = await fetch(`/api/intervals/file/${encodeURIComponent(a.externalId!)}`, { credentials: 'same-origin' })
     if (!r.ok) return
-    const seg = watchSegments((await parseActivityFile(await r.arrayBuffer())).lapList ?? [], steps)
-    const now = data.value?.activities.find(x => x.id === a.id)
-    if (seg && now && (!now.guide?.length || badSegments(now))) saveActivity({ ...now, guide: null, ...seg })
-  } catch { /* resta la ricostruzione dal piano */ }
+    const f = await parseActivityFile(await r.arrayBuffer()), now = data.value?.activities.find(x => x.id === a.id)
+    if (!now) return
+    const seg = steps && structured(steps) ? watchSegments(f.lapList ?? [], steps) : null, patch: Partial<Activity> = {}
+    if (seg && (!now.guide?.length || badSegments(now))) Object.assign(patch, { guide: null, ...seg })
+    if (now.path === undefined) patch.path = f.path ?? null // null: il file non ha il GPS, non si riprova
+    if (Object.keys(patch).length) saveActivity({ ...now, ...patch })
+  } catch { /* restano i dati che ci sono */ }
+}
+/** Mappa, legenda e "Salva come percorso". */
+function RunPath({ a, segs }: { a: Activity; segs: { sec: number; work?: boolean | null }[] | null }) {
+  const d = data.value!, [M, setM] = useState<any>(null), [fail, setFail] = useState(false)
+  useEffect(() => { import('./RouteMap').then(x => setM(() => x.RunMap)).catch(() => setFail(true)) }, [])
+  const parts = pathParts(a.path!, segs), mixed = parts.some(p => p.work === false) && parts.some(p => p.work !== false)
+  const saved = (d.routes ?? []).find(r => r.fromRun === a.id), full = (d.routes ?? []).length >= MAX_ROUTES
+  const save = () => { const id = uid(); saveRoute(routeFromRun(a, id, `Giro del ${fmtDate(a.date, { day: 'numeric', month: 'long' })}`)); nav(`percorsi/${id}`) }
+  return <section class="panel run-path">
+    {fail || !online.value ? <div class="rt-map rt-off"><Thumb track={a.path!.map(p => [p[1], p[2]])} big /></div> : M ? <M parts={parts} /> : <div class="rt-map rt-off"><p>Apro la mappa…</p></div>}
+    {mixed && <p class="legend"><span><i class="run" />Corsa</span><span><i class="rest" />Cammino e recupero</span><span><i class="start" />Partenza</span></p>}
+    {saved ? <a class="btn ghost" href={`#/percorsi/${saved.id}`}>Apri il percorso salvato: {saved.name}</a>
+      : <><h2>Ti è piaciuto questo giro?</h2><p class="sub">Salvalo tra i percorsi: te lo riproporrò nelle sedute di durata simile e potrai mandarlo all'orologio.</p>
+        {full ? <p class="err">Puoi salvare al massimo {MAX_ROUTES} percorsi. Eliminane uno in Percorsi.</p> : <button type="button" class="btn" onClick={save}>Salva come percorso</button>}</>}
+  </section>
 }
 const pace = (s: number | null) => s ? `${mmss(s)}/km` : ''
 export function RunView({ route }: { route: string }) {
@@ -30,7 +53,8 @@ export function RunView({ route }: { route: string }) {
   const ses = a?.sessionKey && t ? t.slots.flatMap(s => s.sessions.map(x => [sessionKey(s, x.day), x] as const)).find(([k]) => k === a.sessionKey)?.[1] : undefined
   const steps = a?.type === 'corsa' ? stepsOf(ses) : null
   useEffect(() => {
-    if (a?.externalId && ((!a.guide?.length && !a.segFrom) || (a.segFrom === 'orologio' && badSegments(a))) && d.me?.intervals && steps && structured(steps)) void upgrade(a, steps)
+    const segNeed = !!steps && structured(steps) && ((!a?.guide?.length && !a?.segFrom) || (a?.segFrom === 'orologio' && badSegments(a!)))
+    if (a?.externalId && a.type === 'corsa' && d.me?.intervals && (segNeed || a.path === undefined)) void upgrade(a, steps)
   }, [a?.id, a?.guide, a?.segFrom])
   if (!a) return <div class="stack"><section class="head"><h1>Corsa non trovata</h1></section><a class="btn ghost" href="#/andamento">Torna ad Andamento</a></div>
   const tr = a.trace ?? [], max = hrMaxOf(d), zones = zonesOf(d)
@@ -51,6 +75,7 @@ export function RunView({ route }: { route: string }) {
       <section class="head"><p class="eyebrow">{fmtDate(a.date)}</p><h1>{ses?.text ?? 'Corsa'}</h1></section>
       <div class="stats run">{stats.map(([v, l]) => <div key={l as string}><b>{v}</b><span>{l}</span></div>)}</div>
       {!tr.length && <p class="sub pad">Carica il file FIT per vedere grafici e intertempi.</p>}
+      {(a.path?.length ?? 0) > 9 && <RunPath a={a} segs={segs} />}
       {hr.length > 1 && <Line pts={hr} {...range(hr, 8)} title={`Frequenza cardiaca${span(hr)} bpm`} unit=" bpm" dots={false} />}
       {inZ && zTot > 0 && <section class="zones"><h2>Tempo in zona</h2>{zones!.map((z, i) => <div class="zn" key={z.id}><span>{z.name}</span><i><u style={{ width: `${inZ[i] / zTot * 100}%` }} /></i><b>{Math.round(inZ[i] / zTot * 100)}%</b></div>)}</section>}
       {!zones && tr.length > 0 && <p class="sub pad"><a href="#/impostazioni/corpo">Imposta la FC massima</a> per vedere il tempo in zona.</p>}

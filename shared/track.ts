@@ -1,6 +1,7 @@
 /* Lettura di GPX e TCX, i formati esportati da Garmin, Coros, Polar, Strava, Apple Salute (tramite app) e altri. */
 import type { Activity } from './engine'
 import { meters } from './gps'
+import { pathFrom } from './path'
 import type { RawLap } from './segments'
 export type Imported = Partial<Activity> & { date: string; sport: string; laps: number; lapList?: RawLap[] }
 interface Pt { t: number; lat?: number; lon?: number; alt?: number; hr?: number; cad?: number; dist?: number }
@@ -38,7 +39,7 @@ function summarize(p: Pt[], sport: string, opt: { laps: number; seconds?: number
   return {
     date, sport, laps: opt.laps, source: opt.source, type: sport as Activity["type"],
     km: Math.round(dist / 10) / 100, seconds: Math.round(opt.seconds ?? moving), hrAvg: avg(hrs), hrMax: hrs.length ? Math.max(...hrs) : null, hrLast: avg(lastKm),
-    splits: splits.join(' - ') || null, trace, cadence: cads.length ? Math.round(avg(cads)! * twice) : null, ascent: hasAlt ? Math.round(gain) : null,
+    splits: splits.join(' - ') || null, trace, path: pathFrom(p.map(x => ({ t: (x.t - t0) / 1000, lat: x.lat, lon: x.lon }))), cadence: cads.length ? Math.round(avg(cads)! * twice) : null, ascent: hasAlt ? Math.round(gain) : null,
   }
 }
 export function parseGpx(xml: string): Imported {

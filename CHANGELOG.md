@@ -6,6 +6,26 @@ Numerazione: il numero centrale cresce quando cambia una funzione, l'ultimo quan
 
 Le sezioni ammesse in ogni versione sono Aggiunto, Modificato e Tolto.
 
+## 1.26.0 - 2026-11-10
+
+### In breve
+
+- La mappa di ogni corsa importata dall'orologio
+- Salva come percorso i giri che ti sono piaciuti
+- Nelle corse di Oggi, un percorso della lunghezza giusta, se lo vuoi
+
+### Aggiunto
+
+- Percorso GPS delle corse importate da file FIT, GPX e TCX e da Intervals.icu, con mappa nella pagina della corsa e tratti di corsa e di cammino in due colori.
+- Salva come percorso: il giro di una corsa diventa un percorso da rinominare, modificare e mandare all'orologio.
+- Proposta facoltativa di percorso nelle corse di Oggi, con la lunghezza della seduta o, per le sedute a tempo, stimata dal ritmo delle sedute simili.
+- Pagina delle alternative: percorsi salvati e giri già corsi entro il 10% della lunghezza, poi un anello nuovo, oppure Corro senza.
+
+### Modificato
+
+- Una corsa mandata di nuovo dall'orologio completa quella già registrata invece di crearne un doppione.
+- Le corse importate da Intervals.icu prima di questa versione prendono il percorso quando apri la loro pagina.
+
 ## 1.25.2 - 2026-11-10
 
 ### In breve

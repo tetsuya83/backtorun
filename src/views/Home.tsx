@@ -19,6 +19,8 @@ import { segmentsOf, stepsOf, workSummary } from '../../shared/segments'
 import { shoeUse } from '../../shared/shoes'
 import { easyPace, paceRange, walkFrom } from '../../shared/paces'
 import { zonesOf } from '../../shared/analysis'
+import { targetKm } from '../../shared/path'
+import { SessionRoute } from './Routes'
 import { StopCard } from './Stop'
 import { local, unlockSound } from '../sound'
 import { useEffect } from 'preact/hooks'
@@ -106,6 +108,8 @@ function TodayCard() {
   const run = ses.km !== 0, blocks = run ? blocksOf(ses) : null, tone = sessionTone(ses), art = learnFor(ses.text), warm = warmupFor(ses.text), cool = cooldownFor(ses.text, ses.km)
   const route = d.routes?.find(x => x.session?.key === key)
   const pace = run && tone?.key === 'easy' && !/cammin/i.test(ses.text) ? easyPace(d.activities, zonesOf(d), today, walkFrom(t)) : null
+  const ep = run ? easyPace(d.activities, zonesOf(d), today, walkFrom(t)) : null, target = run ? targetKm(ses, t, d.activities, today, ep ? (ep.lo + ep.hi) / 2 : null) : null
+  const routeRow = run && !done && (!!route || (!!target && !(d.state.adaptSeen ?? []).includes(`route-no-${key}`)))
   const facts = [run ? `${sessionMin(ses)} min` : null, ses.fiato ? `fiato: ${ses.fiato.toLowerCase()}` : null, ses.fatica ? `fatica ${ses.fatica}${/^\d/.test(ses.fatica) ? ' su 10' : ''}` : null].filter(Boolean).join(' · ')
   return <section class="panel today-c">
     <div class="pill-row"><p class="eyebrow">{label}</p>{tone && <span class={'pill ' + tone.key}>{tone.label}</span>}</div>
@@ -122,9 +126,10 @@ function TodayCard() {
     </> : <>
       {blocks ? <button type="button" class="btn go" onClick={() => go(`guida?key=${key}&date=${today}&go=1`)}><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d={ICON.play} /></svg>Parti</button>
         : <a class="btn" href={`#/registra?key=${key}&date=${today}`}>Registra</a>}
+      {routeRow && <SessionRoute skey={key} date={today} label={ses.text} target={target} />}
       {run && <div class="quick">
         <a href={`#/routine?id=${warm.id}`}><Ic d={ICON.clock} />Riscaldamento {mins(warm)}'</a>
-        <a href={route ? `#/percorsi/${route.id}` : `#/percorsi/nuovo?key=${encodeURIComponent(key)}&date=${today}&km=${ses.km ?? 0}&label=${encodeURIComponent(ses.text)}`}><Ic d={ICON.route} />{route ? 'Il percorso' : 'Percorso'}</a>
+        {!routeRow && <a href={`#/percorsi/${target ? 'proposte' : 'nuovo'}?key=${encodeURIComponent(key)}&date=${today}&km=${target ?? 0}&label=${encodeURIComponent(ses.text)}`}><Ic d={ICON.route} />Percorso</a>}
         <a href={`#/registra?key=${key}&date=${today}`}><Ic d={ICON.plus} />Registra a mano</a>
       </div>}
     </>}

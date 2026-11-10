@@ -1,6 +1,7 @@
 import { Decoder, Stream } from '@garmin/fitsdk'
 import type { Activity } from '../shared/engine'
 import { parseXmlTrack } from '../shared/track'
+import { deg, pathFrom } from '../shared/path'
 import type { RawLap } from '../shared/segments'
 /** lapList: i lap dell'orologio, da cui si ricavano i tratti di una seduta a ripetute. */
 export type FitResult = Partial<Activity> & { date: string; sport: string; laps: number; lapList?: RawLap[] }
@@ -46,7 +47,7 @@ export function parseFit(buf: ArrayBuffer): FitResult {
     type: sport === 'cycling' ? 'bici' : sport === 'swimming' ? 'nuoto' : sport === 'running' || sport === 'walking' ? 'corsa' : 'altro',
     km: Math.round(dist / 10) / 100, seconds: Math.round(secs),
     hrAvg: sess?.avgHeartRate ?? avg(hrs), hrMax: sess?.maxHeartRate ?? (hrs.length ? Math.max(...hrs) : null), hrLast: avg(lastKm),
-    splits: splits.join(' - ') || null, trace,
+    splits: splits.join(' - ') || null, trace, path: pathFrom(rec.map(r => ({ t: (r.timestamp.getTime() - t00) / 1000, lat: deg(r.positionLat), lon: deg(r.positionLong) }))),
     cadence: cadence ? Math.round(cadence * twice) : null, ascent: sess?.totalAscent != null ? Math.round(sess.totalAscent) : ref != null ? Math.round(gain) : null,
   }
 }

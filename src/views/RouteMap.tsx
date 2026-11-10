@@ -52,3 +52,26 @@ export function RouteMap({ track, way, center, fit, edit, onTap, onMove }: Props
   }, [fit, ready])
   return bad ? <div class="rt-map rt-off"><p>La mappa non si apre su questo browser.</p></div> : <div ref={box} class="rt-map" role="application" aria-label="Mappa del percorso" />
 }
+
+/** La mappa di una corsa fatta: tratti di corsa e di cammino con due colori, partenza segnata. */
+export function RunMap({ parts }: { parts: { c: Pt[]; work: boolean | null }[] }) {
+  const box = useRef<HTMLDivElement>(null), [bad, setBad] = useState(false)
+  useEffect(() => {
+    const all = parts.flatMap(p => p.c)
+    if (all.length < 2) return
+    let m: maplibregl.Map
+    try { m = new maplibregl.Map({ container: box.current!, style: STYLE, center: [all[0][0], all[0][1]], zoom: 14, attributionControl: { compact: true } }) }
+    catch { setBad(true); return }
+    m.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
+    const b = new maplibregl.LngLatBounds(); all.forEach(p => b.extend([p[0], p[1]])); m.fitBounds(b, { padding: 36, duration: 0 })
+    m.on('load', () => {
+      const fc = { type: 'FeatureCollection' as const, features: parts.map(p => ({ ...line(p.c), properties: { k: p.work === false ? 'rest' : 'run' } })) }
+      m.addSource('p', { type: 'geojson', data: fc })
+      m.addLayer({ id: 'p-b', type: 'line', source: 'p', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#fff', 'line-width': 8 } })
+      m.addLayer({ id: 'p', type: 'line', source: 'p', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': ['match', ['get', 'k'], 'rest', '#d9822b', '#0b66c3'], 'line-width': 5 } })
+      new maplibregl.Marker({ color: '#17694f', scale: .7 }).setLngLat([all[0][0], all[0][1]]).addTo(m)
+    })
+    return () => m.remove()
+  }, [])
+  return bad ? <div class="rt-map rt-off"><p>La mappa non si apre su questo browser.</p></div> : <div ref={box} class="rt-map run-map" role="img" aria-label="Mappa della corsa" />
+}

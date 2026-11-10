@@ -250,3 +250,12 @@ details.more>summary b{flex:none}
 .shoe .bar i{background:var(--easy)}.shoe .bar.quasi i{background:var(--warn)}.shoe .bar.cambia i{background:var(--stop)}
 .tag{font-size:13px;font-weight:600;color:var(--muted);white-space:nowrap}.tag.go{color:var(--blue-i)}.tag.stop{color:var(--hard-i)}
 .pace-c{display:flex;flex-direction:column;gap:8px}.pace-c h2{margin:0}.pace-c .big{font-size:32px;font-weight:800;line-height:1;margin:0}.pace-c .big small{font-size:15px;font-weight:600;color:var(--muted)}
+.ses-route{border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:8px}.ses-route .sub{margin:0}
+.sr-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.sr-head small{font-size:13px;color:var(--muted)}
+.sr-pick{display:flex;gap:12px;align-items:center}.sr-pick span{display:flex;flex-direction:column;min-width:0}.sr-pick small{color:var(--muted);font-size:14px}
+.row-l{display:flex;gap:8px 16px;flex-wrap:wrap;align-items:center}
+.chip-l{min-height:40px;display:inline-flex;align-items:center;padding:0 14px;border-radius:980px;border:0;background:var(--blue-t);color:var(--blue-i);font:inherit;font-size:14px;font-weight:500;text-decoration:none;cursor:pointer}.chip-l.ghost{background:none;border:1px solid var(--line);color:var(--text)}
+.rt-choice{display:flex;gap:12px;align-items:center;background:var(--card);border-radius:20px;padding:12px}.rt-choice>span{flex:1;min-width:0;display:flex;flex-direction:column}.rt-choice small{color:var(--muted);font-size:14px}
+.run-path{display:flex;flex-direction:column;gap:10px}.run-path h2{margin:0}.run-map{height:260px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:14px;color:var(--muted);margin:0}.legend span{display:flex;align-items:center;gap:6px}.legend i{display:inline-block;width:18px;height:6px;border-radius:3px;background:#0b66c3}.legend i.rest{background:#d9822b}.legend i.start{width:10px;height:10px;border-radius:50%;background:#17694f}
+.rt-choices{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { call, data, deleteRoute, online, saveRoute, saveState, setRoutingLinked, uid } from '../api'
 import { addDays } from '../../shared/engine'
+import { choicesFor, routeFromRun, TOLERANCE, type Choice } from '../../shared/path'
 import { GROUNDS, isSent, rankLoops, routeSig, type Ground, type Mix, buildGpx, buildRoute, fitOf, gainOf, isRouteGpx, legsOf, MAX_ROUTES, mirror, splitLoop, parseRouteGpx, type Leg, type LngLat, type Pt, type Route, type RouteSession } from '../../shared/route'
-import { Field, Note } from '../ui'
+import { Field, goBack, Note } from '../ui'
 import { fmtDate, todayISO } from '../guide'
 
 const SHARED = 'btr-route-gpx'
@@ -13,7 +14,7 @@ const gpxFile = (r: Route) => new File([buildGpx(r)], fileName(r), { type: 'appl
 /** Porta un GPX senza orari nell'editor, da qualsiasi punto arrivi. */
 export function openRouteGpx(xml: string) { try { sessionStorage.setItem(SHARED, xml) } catch { /* file troppo grande */ } location.hash = '#/percorsi/nuovo?gpx=1' }
 export const looksLikeRoute = isRouteGpx
-function Thumb({ track, big }: { track: Pt[]; big?: boolean }) {
+export function Thumb({ track, big }: { track: Pt[]; big?: boolean }) {
   if (track.length < 2) return <span class="rt-thumb" />
   const xs = track.map(p => p[0]), ys = track.map(p => p[1]), x0 = Math.min(...xs), y1 = Math.max(...ys), k = Math.cos(y1 * Math.PI / 180), w = (Math.max(...xs) - x0) * k || 1e-4, h = y1 - Math.min(...ys) || 1e-4, s = 56 / Math.max(w, h)
   const step = Math.max(1, Math.ceil(track.length / 120)), pts = track.filter((_, i) => !(i % step)).map(p => `${(6 + (p[0] - x0) * k * s + (56 - w * s) / 2).toFixed(1)},${(6 + (y1 - p[1]) * s + (56 - h * s) / 2).toFixed(1)}`).join(' ')
@@ -181,14 +182,58 @@ export function Routes({ route }: { route: string }) {
   const [path, q] = route.split('?'), [, id, sub] = path.split('/'), query = new URLSearchParams(q ?? '')
   if (!id) return <List />
   if (id === 'nuovo') return <Editor query={query} />
+  if (id === 'proposte') return <Proposals query={query} />
   const r = data.value!.routes?.find(x => x.id === id)
   if (!r) return <div class="stack"><section class="head"><h1>Percorso non trovato</h1></section><a class="btn ghost" href="#/percorsi">Torna ai percorsi</a></div>
   return sub === 'modifica' ? <Editor edit={r} query={query} /> : <Detail r={r} />
 }
-/** Nella seduta del piano: il percorso collegato, o il modo per crearne uno della distanza giusta. */
-export function SessionRoute({ skey, date, label, km: dist }: { skey: string; date: string; label: string; km?: number | null }) {
-  const r = data.value!.routes?.find(x => x.session?.key === skey)
-  return r ? <a class="btn ghost" href={`#/percorsi/${r.id}`}>Percorso: {r.name}, {km(r.km)} km</a> : <a class="btn ghost" href={`#/percorsi/nuovo?key=${encodeURIComponent(skey)}&date=${date}&km=${dist ?? 0}&label=${encodeURIComponent(label)}`}>Crea un percorso per questa seduta</a>
+const qs = (o: Record<string, string | number>) => Object.entries(o).map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join('&')
+const kmTxt = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',')
+const noRoute = (skey: string) => `route-no-${skey}`
+/** Nella seduta di Oggi: il percorso scelto, oppure la proposta facoltativa di sceglierne uno della lunghezza giusta. */
+export function SessionRoute({ skey, date, label, target }: { skey: string; date: string; label: string; target: number | null }) {
+  const d = data.value!, r = d.routes?.find(x => x.session?.key === skey), seen = d.state.adaptSeen ?? []
+  const q = qs({ key: skey, date, label, km: target ?? 0 })
+  if (r) return <div class="ses-route">
+    <div class="sr-pick"><Thumb track={r.track} /><span><b>{r.name}</b><small>{km(r.km)} km{r.fromRun ? ' · un giro che hai già corso' : ''}</small></span></div>
+    <div class="row-l"><a href={`#/percorsi/${r.id}`}>{isSent(r) ? 'Apri il percorso' : 'Manda all\'orologio'}</a><a href={`#/percorsi/proposte?${q}`}>Cambia</a><button type="button" class="link" onClick={() => saveRoute({ ...r, session: null })}>Togli</button></div>
+  </div>
+  if (!target || seen.includes(noRoute(skey))) return null
+  const n = choicesFor(target, d.routes ?? [], d.activities).length
+  return <div class="ses-route">
+    <div class="sr-head"><b>Vuoi un percorso?</b><small>Facoltativo</small></div>
+    <p class="sub">Circa {kmTxt(target)} km, dalla durata della seduta e dal ritmo delle tue uscite simili.</p>
+    <div class="row-l">
+      <a class="chip-l" href={n ? `#/percorsi/proposte?${q}` : `#/percorsi/nuovo?${q}`}>{n ? `Vedi ${n === 1 ? 'la proposta' : `${n} proposte`}` : 'Crea un anello'}</a>
+      <button type="button" class="chip-l ghost" onClick={() => saveState({ ...d.state, adaptSeen: [...seen, noRoute(skey)].slice(-60) })}>Corro senza</button>
+    </div>
+  </div>
+}
+/** Le alternative per una seduta: prima i giri che conosci, poi un anello nuovo. Sceglierne uno è facoltativo. */
+function Proposals({ query }: { query: URLSearchParams }) {
+  const d = data.value!, skey = query.get('key') ?? '', date = query.get('date') ?? todayISO(), label = query.get('label') ?? '', target = +(query.get('km') ?? 0)
+  const list = target ? choicesFor(target, d.routes ?? [], d.activities) : [], full = (d.routes ?? []).length >= MAX_ROUTES
+  const session: RouteSession = { key: skey, date, label, km: target || null }
+  const pick = (c: Choice) => {
+    for (const o of d.routes ?? []) if (o.session?.key === skey && (c.kind === 'run' || o.id !== c.r.id)) saveRoute({ ...o, session: null })
+    if (c.kind === 'route') saveRoute({ ...c.r, session })
+    else saveRoute(routeFromRun(c.a, uid(), `Giro del ${fmtDate(c.a.date, { day: 'numeric', month: 'long' })}`, session))
+    goBack('home')
+  }
+  const without = () => { saveState({ ...d.state, adaptSeen: [...(d.state.adaptSeen ?? []), noRoute(skey)].slice(-60) }); goBack('home') }
+  const lo = kmTxt(target * (1 - TOLERANCE)), hi = kmTxt(target * (1 + TOLERANCE))
+  return <div class="stack">
+    <section class="head"><p class="eyebrow">{fmtDate(date, { weekday: 'long', day: 'numeric' })}{label ? ` · ${label}` : ''}</p><h1>Percorsi di circa {kmTxt(target)} km</h1><p>Prima i giri che conosci, poi quelli nuovi. Sceglierne uno è facoltativo.</p></section>
+    {list.length > 0 && <><h2 class="sect">I tuoi giri</h2>
+      <ul class="rt-choices">{list.map(c => { const tr = c.kind === 'route' ? c.r.track : c.a.path!.map(p => [p[1], p[2]] as Pt)
+        return <li key={c.kind === 'route' ? c.r.id : c.a.id} class="rt-choice"><Thumb track={tr} /><span><b>{c.kind === 'route' ? c.r.name : 'Il giro del ' + fmtDate(c.a.date, { day: 'numeric', month: 'long' })}</b><small>{km(c.km)} km · {c.kind === 'route' ? (c.r.fromRun ? 'un giro che hai già corso' : c.r.source === 'gpx' ? 'da GPX' : 'disegnato da te') : 'corso il ' + fmtDate(c.a.date, { day: 'numeric', month: 'long' })}</small></span>
+          {c.kind === 'run' && full ? <small class="err">Percorsi pieni</small> : <button type="button" class="chip-l" onClick={() => pick(c)}>Scegli</button>}</li> })}</ul></>}
+    <h2 class="sect">Qualcosa di nuovo</h2>
+    <section class="panel"><h2>Crea un anello nuovo</h2><p class="sub">Da casa o da un punto sulla mappa, con il fondo che preferisci. Usa openrouteservice solo quando lo chiedi.</p>
+      <a class="btn ghost" href={`#/percorsi/nuovo?${qs({ key: skey, date, label, km: target })}`}>Proponi anelli da {kmTxt(target)} km</a></section>
+    <button type="button" class="btn ghost" onClick={without}>Oggi corro senza percorso</button>
+    <p class="sub pad">Valgono i giri tra {lo} e {hi} km. Se la seduta è a km, conta la distanza del piano.</p>
+  </div>
 }
 export function RoutingSettings() {
   const on = !!data.value!.me?.routing, [key, setKey] = useState(''), [busy, setBusy] = useState(false), [err, setErr] = useState('')
